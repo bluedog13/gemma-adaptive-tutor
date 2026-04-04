@@ -1,0 +1,141 @@
+"""All Gemma 4 prompt templates for MAP Accelerator."""
+
+from src.constants import (
+    NWEA_CONDITIONAL_GROWTH,
+    NWEA_MEAN_RIT,
+    estimate_percentile,
+    get_percentile_cutoffs,
+)
+
+
+def _build_norms_context(grade: int, latest_rit: int, season: str = "fall") -> str:
+    """Build NWEA norms context string for prompts."""
+    means = NWEA_MEAN_RIT.get(grade, NWEA_MEAN_RIT[3])
+    season_pcts = get_percentile_cutoffs(grade, season)
+    cond_growth = NWEA_CONDITIONAL_GROWTH.get(grade, NWEA_CONDITIONAL_GROWTH[3])
+    pct = estimate_percentile(latest_rit, grade, season)
+
+    return f"""NWEA 2025 National Norms for Grade {grade} Math:
+- Mean RIT: Fall {means['fall']}, Winter {means['winter']}, Spring {means['spring']}
+- Percentile cutoffs ({season.capitalize()}): 25th={season_pcts[25]}, 50th={season_pcts[50]}, 75th={season_pcts[75]}, 90th={season_pcts[90]}, 95th={season_pcts[95]}
+- This student's latest RIT {latest_rit} ({season.capitalize()}) is approximately at the {pct}th percentile
+
+Expected fall-to-spring growth by starting percentile (Grade {grade}):
+- 10th percentile students: ~{cond_growth[10]} RIT points
+- 25th percentile students: ~{cond_growth[25]} RIT points
+- 50th percentile students: ~{cond_growth[50]} RIT points
+- 75th percentile students: ~{cond_growth[75]} RIT points
+- 90th percentile students: ~{cond_growth[90]} RIT points
+- 95th percentile students: ~{cond_growth[95]} RIT points
+
+Key research findings (NWEA, Fordham Institute, Northwestern CTD):
+- Advanced students (75th+ percentile) consistently show LOWER growth than peers — not because they can't grow, but because they aren't challenged with above-grade-level content
+- This is called the "excellence gap": high-achieving students plateau when instruction focuses on grade-level proficiency rather than extension
+- A student at the 90th percentile typically grows only {cond_growth[90]} RIT points/year vs {cond_growth[50]} for a median student — that's {cond_growth[50] - cond_growth[90]} fewer points of growth
+- NWEA research shows these norms are DESCRIPTIVE (what typically happens), NOT PRESCRIPTIVE (what should happen) — advanced students CAN grow more with targeted enrichment
+- The "sawtooth pattern" (scores dip at start of year, recover by spring) is common when untaught above-grade content is assessed
+- The conditional growth data above shows what students WHO STARTED AT THE SAME LEVEL are growing nationally. If this student is growing LESS than peers who started at the same level, it means other schools/programs ARE closing this gap — this student's school is not providing sufficient challenge
+- Growing below expected for your starting percentile = falling behind similar-ability peers nationally, even if the raw score is still high"""
+
+
+def build_trend_prompt(grade: int, timeline: str, latest_rit: int, season: str = "fall") -> str:
+    """Build the trend analysis prompt for Gemma 4."""
+    norms_context = _build_norms_context(grade, latest_rit, season)
+
+    return f"""You are an educational data analyst specializing in MAP (NWEA) assessment data.
+
+A grade {grade} student has the following MAP Math RIT scores:
+{timeline}
+
+{norms_context}
+
+IMPORTANT ANALYSIS RULES:
+1. Focus on RECENT growth (last 2-3 test sessions), not just the total over all time
+2. If the score dropped from spring to fall when entering a new grade, that is a "sawtooth pattern" — flag it
+3. If the student's RIT is the same or lower than it was 2-3 sessions ago, that is STALLING, not growing
+4. Compare the student's RECENT growth rate against expected growth for their percentile level
+5. Be honest — do not say "strong growth" if the student has plateaued recently
+6. A student who scores 196 in Spring, drops to 193 in Fall, and recovers to 196 in Winter has had ZERO net growth in 9 months — that is stalling
+7. The "expected fall-to-spring growth" numbers ONLY apply to fall-to-spring comparisons within the SAME school year. Do NOT cite these numbers for spring-to-winter or spring-to-fall intervals — those cross grade boundaries and are not comparable. For non fall-to-spring intervals, describe the actual growth without citing a specific expected number
+
+Compare this student's actual growth against what is typical for students at their percentile level. Use the national norms data above to ground your analysis in real numbers.
+
+Analyze this student's trajectory. Respond with ONLY a JSON object with these exact keys:
+{{
+  "trend": "growing" or "stalling" or "declining",
+  "where_they_stand": "One sentence: their current percentile and how it compares to grade-level peers",
+  "growth_pattern": "One sentence: RECENT growth (last 2-3 sessions) vs expected, cite the specific numbers",
+  "what_this_means": "One sentence: name the pattern (excellence gap, sawtooth, plateau, strong growth, etc.) and why it matters",
+  "recommendation": "One sentence: a specific, actionable next step"
+}}
+
+JSON:"""
+
+
+def build_exercise_prompt(
+    student_name: str,
+    grade: int,
+    band_name: str,
+    all_concepts: list[str],
+    num_questions: int = 5,
+    weak_concepts: list[str] | None = None,
+) -> str:
+    """Build the exercise generation prompt for Gemma 4."""
+    focus_note = ""
+    if weak_concepts:
+        focus_note = f"\nFocus more questions on these concepts the student is struggling with: {', '.join(weak_concepts)}"
+
+    return f"""You are a math tutor for a grade {grade} student named {student_name}.
+
+Generate exactly {num_questions} math practice exercises for the following concepts from RIT band {band_name}:
+
+Concepts to cover:
+{chr(10).join(f'- {c}' for c in all_concepts)}
+{focus_note}
+
+Requirements:
+- Age-appropriate for grade {grade} (ages {grade + 5}-{grade + 6})
+- Mix of question types: word_problem, multiple_choice, fill_in_the_blank
+- Multiple choice questions should have exactly 4 choices
+- Each question should test ONE concept
+- Include a clear, step-by-step explanation for each answer
+- Make word problems relatable to a child's everyday life
+
+Respond with ONLY a JSON array of exercises. Each exercise must have:
+- "concept": the specific concept being tested
+- "topic": the broader topic category
+- "question": the full question text
+- "question_type": one of "word_problem", "multiple_choice", "fill_in_the_blank"
+- "choices": array of 4 options (only for multiple_choice, null otherwise)
+- "correct_answer": the correct answer as a string
+- "explanation": step-by-step explanation of how to solve it
+
+JSON array:"""
+
+
+def build_report_prompt(
+    student_name: str,
+    grade: int,
+    latest_rit: int,
+    trend: str,
+    num_sessions: int,
+    mastered_concepts: list[str],
+    needs_work_concepts: list[str],
+) -> str:
+    """Build the progress report prompt for Gemma 4."""
+    return f"""You are writing a brief progress report for a grade {grade} student named {student_name}.
+
+Student data:
+- Latest MAP RIT score: {latest_rit}
+- Trend: {trend}
+- Total practice sessions: {num_sessions}
+- Mastered concepts (>=80% correct): {', '.join(mastered_concepts) if mastered_concepts else 'None yet'}
+- Needs more work (<80% correct): {', '.join(needs_work_concepts) if needs_work_concepts else 'None yet'}
+
+Write a 3-4 paragraph report for their teacher or parent that:
+1. Summarizes where the student is and their growth trend
+2. Highlights what they've mastered
+3. Recommends specific next steps for concepts that need work
+4. Encourages continued practice
+
+Keep the tone warm, specific, and actionable. No jargon — a parent should understand it."""

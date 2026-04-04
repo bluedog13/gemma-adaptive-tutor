@@ -1,0 +1,81 @@
+{
+  "subject": "Mathematics",
+  "level": "2+",
+  "source": "NWEA RIT to Concept, April 2025",
+  "note": "Concepts to Introduce — skills in the band ABOVE a student's score",
+  "bands": {
+    "131-140": {
+      "topics": {
+        "Whole Numbers — Counting and Cardinality": ["number"]
+      }
+    },
+    "141-150": {
+      "topics": {
+        "Whole Numbers — Addition / Subtraction": ["compare quantities", "sum"],
+        "Length": ["length", "height", "width"],
+        "Identification and Classification of 2-D Shapes": ["circles", "rectangles", "triangles", "measure", "squares"]
+      },
+      "additional_learning_continuum_topics": ["Data Analysis"]
+    },
+    "151-160": {
+      "building_on_prior": ["add", "octagon", "rhombus", "category", "parallelogram", "subtract", "equal parts", "pentagon", "trapezoids", "hexagon"],
+      "topics": {
+        "Number Sentences / Equations / Equivalence": ["difference", "parts of addition and subtraction problems"],
+        "Time": ["hour"],
+        "Spatial Concepts and Symmetry": ["location words"],
+        "Whole Numbers — Compare / Order": ["backwards", "count", "order"]
+      }
+    },
+    "161-170": {
+      "building_on_prior": ["digit", "hundreds", "start, change, end", "fourths", "ones", "tens", "halves", "open or closed shape", "thirds"],
+      "topics": {
+        "Money": ["coins", "dollar"],
+        "Problem Solving with Units": ["foot", "mile", "yard", "inch", "ruler", "yardstick"],
+        "Data Representation": ["bar graph", "pictograph", "measurement scale", "scale"]
+      },
+      "additional_learning_continuum_topics": ["Decimals — Addition/Subtraction", "Angle Measurement", "Area"]
+    },
+    "171-180": {
+      "building_on_prior": ["denominator", "hundred thousands", "quarter hour", "edges", "line of symmetry", "second", "even", "minute", "ten thousands", "faces", "model", "thousands", "fraction", "numerator", "vertices", "half-past", "odd"],
+      "topics": {
+        "Fractions — Compare / Order": ["equivalent"],
+        "Numerical Expressions": ["expanded form", "parentheses in expressions", "unknowns in number sentences"],
+        "Whole Numbers; Decimals — Rounding / Estimation": ["estimation", "rounds"]
+      },
+      "additional_learning_continuum_topics": ["Conversion of Units", "Coordinate Geometry", "Decimals — Represent and Solve Word Problems", "Perimeter/Circumference", "Probability", "Properties and Relationships of Operations", "Whole Numbers — Concepts/Properties"]
+    },
+    "181-190": {
+      "building_on_prior": ["a.m. / p.m.", "equations", "scatter plot", "chart", "hundred millions", "table", "coordinates", "million", "ten millions", "degree", "multiples"],
+      "topics": {
+        "Fractions: Addition / Subtraction": ["mixed number"]
+      }
+    },
+    "191-200": {
+      "building_on_prior": ["decimals", "dividend", "divisor", "dot plot", "estimate", "equilateral", "isosceles", "likelihood (of event)", "line segments", "lines", "positive", "proportion", "negative", "number line", "perimeter", "points", "prime", "rays", "solution", "unit rate", "variable"],
+      "topics": {
+        "Fractions — Represent and Solve Word Problems": ["composite", "converts", "factor", "simplest form"],
+        "Capacity; Weight/Mass": ["capacity", "cups", "gallons", "liter", "ounces", "pints", "pounds", "quarts"]
+      },
+      "additional_learning_continuum_topics": ["Decimals — Multiplication/Division", "Fractions — Multiplication/Division", "Patterns/Sequences/Series", "Rational Numbers — Equivalence and Represent/Model", "Algebraic Expressions", "Linear Functions", "Sample Spaces"]
+    },
+    "201-210": {
+      "building_on_prior": ["associative property", "centimeter", "commutative property", "diagonal", "distance", "distributive property", "inverse", "kilometer", "liter", "mean", "median", "meter", "milliliter", "millimeter", "mode", "nets", "outliers", "quadrants", "scalene", "y-intercept"],
+      "topics": {
+        "Decimals — Compare/Order; Decimals — Represent/Model": ["hundredths", "tenths", "thousandths"],
+        "Volume": ["prism", "pyramid", "unit cube"],
+        "Similarity": ["scale factor"],
+        "Rational Numbers — Solve Real-World and Mathematical Problems": ["rate", "simplify"]
+      },
+      "additional_learning_continuum_topics": ["Congruence", "Measures of Center and Spread (Variability)", "Populations/Random Processes", "Transformations"]
+    },
+    "211-220": {
+      "building_on_prior": ["box plot", "combine terms", "complementary", "diameter", "improper fractions", "joint probability", "mixed number", "outliers", "perpendicular", "quartiles", "radius", "range", "reasonableness", "reflection", "rotation", "rule for patterns or sequences", "supplementary", "translation", "vertical angle"],
+      "topics": {
+        "System of Equations/Inequalities": ["standard form"],
+        "Rate of Change/Slope": ["linear"],
+        "Exponents; Scientific Notation": ["base", "power / powers", "square root"]
+      },
+      "additional_learning_continuum_topics": ["Rational Numbers — Compare/Order", "Integers — Computation"]
+    }
+  }
+}

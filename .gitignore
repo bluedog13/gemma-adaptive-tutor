@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model weights (too large for git)
+*.bin
+*.safetensors
+*.gguf
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# Reports with personal details
+docs/competition/sample_report.pdf
