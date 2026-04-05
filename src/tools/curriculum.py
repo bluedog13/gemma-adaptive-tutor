@@ -29,9 +29,7 @@ def _load_curriculum(subject: str = "math") -> dict:
     from src.constants import SUBJECTS
 
     if subject not in SUBJECTS:
-        raise ValueError(
-            f"Unsupported subject '{subject}'. Must be one of: {SUBJECTS}"
-        )
+        raise ValueError(f"Unsupported subject '{subject}'. Must be one of: {SUBJECTS}")
     global _curriculum_cache
     if subject not in _curriculum_cache:
         path = DATA_DIR / f"rit_to_concept_{subject}_2plus.json"
