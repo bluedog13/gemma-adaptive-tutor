@@ -3,7 +3,18 @@
 import hashlib
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Boolean, create_engine
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Boolean,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 
@@ -21,13 +32,12 @@ class Student(Base):
 
     scores = relationship("Score", back_populates="student")
     sessions = relationship("PracticeSession", back_populates="student")
-    analysis = relationship(
-        "StudentAnalysis", back_populates="student", uselist=False
-    )
+    analysis = relationship("StudentAnalysis", back_populates="student", uselist=True)
 
 
 class Score(Base):
     __tablename__ = "scores"
+    __table_args__ = (UniqueConstraint("student_id", "subject", "season", "year"),)
 
     id = Column(Integer, primary_key=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
@@ -35,6 +45,7 @@ class Score(Base):
     season = Column(String, nullable=False)  # fall, winter, spring
     year = Column(Integer, nullable=False)
     grade = Column(Integer, nullable=True)  # grade at time of test
+    subject = Column(String, nullable=False, default="math")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     student = relationship("Student", back_populates="scores")
@@ -46,10 +57,13 @@ class PracticeSession(Base):
     id = Column(Integer, primary_key=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     band = Column(String, nullable=False)  # e.g. "191-200"
+    subject = Column(String, nullable=False, default="math")
     total_questions = Column(Integer, default=0)
     correct = Column(Integer, default=0)
     score_pct = Column(Float, default=0.0)
-    concept_scores = Column(JSON, default=dict)  # {"capacity": {"correct": 2, "total": 3}}
+    concept_scores = Column(
+        JSON, default=dict
+    )  # {"capacity": {"correct": 2, "total": 3}}
     started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime, nullable=True)
 
@@ -75,11 +89,13 @@ class ExerciseResultRecord(Base):
 
 class StudentAnalysis(Base):
     __tablename__ = "student_analyses"
+    __table_args__ = (
+        UniqueConstraint("student_id", "subject", name="uq_student_subject"),
+    )
 
     id = Column(Integer, primary_key=True)
-    student_id = Column(
-        Integer, ForeignKey("students.id"), nullable=False, unique=True
-    )
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    subject = Column(String, nullable=False, default="math")
     trend = Column(String, nullable=True)
     trend_detail = Column(String, nullable=True)
     develop_band = Column(String, nullable=False)
@@ -94,9 +110,7 @@ class StudentAnalysis(Base):
     student = relationship("Student", back_populates="analysis")
 
 
-def compute_scores_hash(
-    scores: list[dict], grade: int
-) -> str:
+def compute_scores_hash(scores: list[dict], grade: int) -> str:
     """Compute SHA-256 hash of scores + grade for cache invalidation.
 
     :param scores: List of dicts with rit_score, season, year, grade keys.
@@ -104,8 +118,7 @@ def compute_scores_hash(
     :return: Hex digest string.
     """
     tuples = sorted(
-        (s["rit_score"], s["season"], s["year"], s.get("grade", grade))
-        for s in scores
+        (s["rit_score"], s["season"], s["year"], s.get("grade", grade)) for s in scores
     )
     payload = f"{tuples}|{grade}"
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -120,7 +133,29 @@ SessionLocal = sessionmaker(bind=engine)
 
 
 def init_db():
+    """Create tables and verify schema is up-to-date.
+
+    SQLAlchemy's ``create_all`` only creates missing tables — it will NOT add
+    new columns to existing tables.  We check for the ``subject`` column and
+    advise the user to run ``just reset-db`` if it is missing.
+    """
+    import sqlite3
+
     Base.metadata.create_all(engine)
+
+    # Verify the 'subject' column exists on all tables that require it.
+    conn = sqlite3.connect(DATABASE_URL.replace("sqlite:///", ""))
+    try:
+        for table in ("scores", "practice_sessions", "student_analyses"):
+            cursor = conn.execute(f"PRAGMA table_info({table})")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "subject" not in columns:
+                raise RuntimeError(
+                    f"Database schema is outdated — the 'subject' column is missing "
+                    f"from '{table}'. Run `just reset-db` to recreate the database."
+                )
+    finally:
+        conn.close()
 
 
 def get_db():

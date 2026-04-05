@@ -1,0 +1,81 @@
+{
+  "subject": "Science",
+  "level": "2+",
+  "source": "NWEA RIT to Concept, Science 2+, April 2025",
+  "note": "Concepts to Introduce — skills in the band ABOVE a student's score",
+  "bands": {
+    "131-140": {
+      "topics": {
+        "Scientific Inquiry": ["observe", "describe", "compare objects"]
+      }
+    },
+    "141-150": {
+      "topics": {
+        "Life Science": ["living vs non-living", "basic needs of plants", "basic needs of animals"],
+        "Earth and Space Science": ["weather", "seasons", "day and night"],
+        "Scientific Inquiry": ["ask questions", "make predictions", "record observations"]
+      },
+      "additional_learning_continuum_topics": ["Science and Engineering Practices"]
+    },
+    "151-160": {
+      "building_on_prior": ["sort and classify", "use senses", "patterns in nature", "measure length", "measure weight"],
+      "topics": {
+        "Life Science": ["habitats", "life cycles", "inherited traits", "food chains"],
+        "Physical Science": ["states of matter", "properties of materials", "push and pull forces"],
+        "Earth and Space Science": ["rocks and minerals", "soil", "water cycle basics"]
+      }
+    },
+    "161-170": {
+      "building_on_prior": ["metamorphosis", "seed dispersal", "pollination", "producers", "consumers", "decomposers"],
+      "topics": {
+        "Life Science": ["ecosystems", "adaptations", "food webs", "energy flow"],
+        "Physical Science": ["heat transfer", "light and shadow", "sound vibrations", "magnetism"],
+        "Earth and Space Science": ["erosion", "weathering", "fossil formation", "natural resources"]
+      },
+      "additional_learning_continuum_topics": ["Environmental Science", "Technology and Design"]
+    },
+    "171-180": {
+      "building_on_prior": ["photosynthesis basics", "predator-prey", "renewable resources", "nonrenewable resources", "conservation"],
+      "topics": {
+        "Life Science": ["cells and organisms", "plant and animal cells", "organ systems overview"],
+        "Physical Science": ["forms of energy", "energy transformation", "simple machines", "friction"],
+        "Earth and Space Science": ["layers of the earth", "plate tectonics basics", "solar system", "moon phases"]
+      },
+      "additional_learning_continuum_topics": ["Engineering Design Process", "Data Analysis in Science"]
+    },
+    "181-190": {
+      "building_on_prior": ["mitosis basics", "classification of organisms", "biomes", "gravity", "inertia", "electrical circuits"],
+      "topics": {
+        "Life Science": ["photosynthesis and respiration", "genetics basics", "dominant and recessive traits"],
+        "Physical Science": ["chemical vs physical changes", "atoms and molecules", "density", "buoyancy"],
+        "Scientific Inquiry": ["controlled experiments", "variables", "hypothesis testing", "data tables and graphs"]
+      }
+    },
+    "191-200": {
+      "building_on_prior": ["DNA", "natural selection", "periodic table basics", "compounds", "mixtures", "solutions", "pH scale"],
+      "topics": {
+        "Life Science": ["evolution and adaptation", "biodiversity", "human body systems", "cell division"],
+        "Physical Science": ["Newton's laws of motion", "speed and velocity", "acceleration", "waves and wavelength"],
+        "Earth and Space Science": ["climate vs weather", "atmosphere layers", "ocean currents", "rock cycle"]
+      },
+      "additional_learning_continuum_topics": ["Biotechnology", "Space Exploration", "Environmental Impact"]
+    },
+    "201-210": {
+      "building_on_prior": ["meiosis", "Punnett squares", "genotype", "phenotype", "chemical equations", "conservation of mass", "electromagnetic spectrum"],
+      "topics": {
+        "Life Science": ["molecular genetics", "protein synthesis basics", "ecology and populations"],
+        "Physical Science": ["chemical bonding", "energy in reactions", "electricity and magnetism", "nuclear energy basics"],
+        "Earth and Space Science": ["plate boundaries", "earthquake prediction", "stellar evolution", "climate change science"]
+      },
+      "additional_learning_continuum_topics": ["Scientific Modeling", "Peer Review Process"]
+    },
+    "211-220": {
+      "building_on_prior": ["RNA", "mutations", "speciation", "covalent bonds", "ionic bonds", "nuclear fission", "nuclear fusion", "redshift"],
+      "topics": {
+        "Life Science": ["gene expression", "biotechnology applications", "population dynamics"],
+        "Physical Science": ["thermodynamics", "quantum basics", "relativity concepts"],
+        "Earth and Space Science": ["geologic time scale", "radiometric dating", "cosmology basics"]
+      }
+    }
+  }
+}

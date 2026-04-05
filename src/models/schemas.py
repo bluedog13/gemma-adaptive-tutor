@@ -12,6 +12,19 @@ class TestSeason(str, Enum):
     SPRING = "spring"
 
 
+class Subject(str, Enum):
+    MATH = "math"
+    READING = "reading"
+    SCIENCE = "science"
+
+
+SUBJECT_DISPLAY: dict[str, str] = {
+    "math": "Math",
+    "reading": "Language Arts: Reading",
+    "science": "Science",
+}
+
+
 class Trend(str, Enum):
     GROWING = "growing"
     STALLING = "stalling"
@@ -25,6 +38,9 @@ class ScoreInput(BaseModel):
     rit_score: int = Field(..., ge=100, le=350, description="MAP RIT score")
     season: TestSeason
     year: int = Field(..., ge=2020, le=2030, description="School year (e.g. 2026)")
+    subject: Subject = Field(
+        default=Subject.MATH, description="Subject (math, reading, science)"
+    )
 
 
 class StudentInput(BaseModel):
@@ -51,6 +67,7 @@ class CurriculumResult(BaseModel):
     introduce_band: BandInfo
     trend: Trend | None = None
     trend_detail: str | None = None
+    subject: str = "math"
 
 
 # --- Exercise schemas ---
@@ -104,6 +121,7 @@ class SessionSummary(BaseModel):
     score_pct: float
     concept_scores: dict[str, dict]  # concept -> {"correct": n, "total": n}
     timestamp: datetime
+    subject: str = "math"
 
 
 class StudentProgress(BaseModel):
@@ -114,3 +132,4 @@ class StudentProgress(BaseModel):
     sessions: list[SessionSummary]
     mastered_concepts: list[str]  # >= 80% correct
     needs_work_concepts: list[str]  # < 80% correct
+    subject: str = "math"

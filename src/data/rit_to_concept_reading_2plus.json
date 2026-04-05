@@ -1,0 +1,80 @@
+{
+  "subject": "Reading",
+  "level": "2+",
+  "source": "NWEA RIT to Concept, Reading 2+, April 2025",
+  "note": "Concepts to Introduce — skills in the band ABOVE a student's score",
+  "bands": {
+    "131-140": {
+      "topics": {
+        "Foundational Skills": ["phonemic awareness", "letter-sound correspondence"]
+      }
+    },
+    "141-150": {
+      "topics": {
+        "Foundational Skills": ["decode regular words", "high-frequency words", "syllable types"],
+        "Literary Text — Key Ideas": ["retell stories", "central message"]
+      },
+      "additional_learning_continuum_topics": ["Vocabulary Acquisition"]
+    },
+    "151-160": {
+      "building_on_prior": ["blend sounds", "segment words", "vowel teams", "prefixes", "suffixes"],
+      "topics": {
+        "Literary Text — Key Ideas": ["character traits", "sequence of events", "describe characters"],
+        "Informational Text — Key Ideas": ["main topic", "ask and answer questions", "identify key details"],
+        "Foundational Skills": ["read with fluency", "context clues for meaning"]
+      }
+    },
+    "161-170": {
+      "building_on_prior": ["moral of the story", "fables", "folktales", "point of view", "first person", "third person"],
+      "topics": {
+        "Literary Text — Craft and Structure": ["word meaning in context", "figurative language basics", "simile"],
+        "Informational Text — Key Ideas": ["main idea", "supporting details", "summarize"],
+        "Informational Text — Craft and Structure": ["text features", "headings", "captions", "glossary"]
+      },
+      "additional_learning_continuum_topics": ["Writing — Opinion", "Writing — Narrative"]
+    },
+    "171-180": {
+      "building_on_prior": ["theme", "compare and contrast characters", "narrator", "stanza", "verse", "chapter", "scene"],
+      "topics": {
+        "Literary Text — Key Ideas": ["theme development", "character motivation", "plot structure"],
+        "Literary Text — Craft and Structure": ["metaphor", "personification", "author's purpose"],
+        "Informational Text — Key Ideas": ["cause and effect", "compare and contrast", "text structure"]
+      },
+      "additional_learning_continuum_topics": ["Writing — Informative", "Research Skills", "Language — Grammar"]
+    },
+    "181-190": {
+      "building_on_prior": ["conflict", "resolution", "climax", "rising action", "falling action", "alliteration", "onomatopoeia", "hyperbole"],
+      "topics": {
+        "Literary Text — Key Ideas": ["infer character feelings", "draw conclusions", "cite text evidence"],
+        "Informational Text — Key Ideas": ["integrate information from multiple sources", "distinguish fact from opinion"],
+        "Language and Writing": ["context clues — definition", "context clues — synonym", "Greek and Latin roots"]
+      }
+    },
+    "191-200": {
+      "building_on_prior": ["irony", "foreshadowing", "flashback", "idiom", "analogy", "connotation", "denotation", "primary sources", "secondary sources"],
+      "topics": {
+        "Literary Text — Craft and Structure": ["point of view shifts", "author's tone", "mood"],
+        "Informational Text — Craft and Structure": ["author's argument", "evaluate claims", "identify evidence"],
+        "Language and Writing": ["multiple-meaning words", "domain-specific vocabulary", "word relationships"]
+      },
+      "additional_learning_continuum_topics": ["Writing — Argumentative", "Media Literacy", "Speaking and Listening"]
+    },
+    "201-210": {
+      "building_on_prior": ["unreliable narrator", "satire", "allegory", "rhetorical question", "persuasive techniques", "bias", "credibility"],
+      "topics": {
+        "Literary Text — Key Ideas": ["analyze theme across texts", "universal themes", "compare genres"],
+        "Informational Text — Key Ideas": ["synthesize across texts", "evaluate reasoning", "analyze structure"],
+        "Language and Writing": ["academic vocabulary", "etymology", "precise language"]
+      },
+      "additional_learning_continuum_topics": ["Critical Thinking", "Text Complexity"]
+    },
+    "211-220": {
+      "building_on_prior": ["symbolism", "archetype", "allusion", "parallelism", "juxtaposition", "rhetorical appeal", "ethos", "pathos", "logos"],
+      "topics": {
+        "Literary Text — Craft and Structure": ["narrative techniques", "structural choices", "stylistic analysis"],
+        "Informational Text — Craft and Structure": ["evaluate arguments", "counterarguments", "logical fallacies"],
+        "Language and Writing": ["nuanced vocabulary", "register and audience", "synthesis writing"]
+      }
+    }
+  }
+}

@@ -15,6 +15,7 @@ def generate_exercises(
     band: BandInfo,
     num_questions: int = 5,
     weak_concepts: list[str] | None = None,
+    subject: str = "math",
 ) -> ExerciseSet:
     """Generate exercises using Gemma 4."""
 
@@ -31,6 +32,7 @@ def generate_exercises(
         all_concepts=all_concepts,
         num_questions=num_questions,
         weak_concepts=weak_concepts,
+        subject=subject,
     )
 
     response = ollama.chat(
@@ -56,7 +58,9 @@ def generate_exercises(
         raw_choices = ex.get("choices")
         choices = None
         if raw_choices and isinstance(raw_choices, list):
-            choices = [str(c[0]) if isinstance(c, list) else str(c) for c in raw_choices]
+            choices = [
+                str(c[0]) if isinstance(c, list) else str(c) for c in raw_choices
+            ]
 
         exercises.append(
             Exercise(
@@ -88,6 +92,7 @@ def generate_report(progress: StudentProgress) -> str:
         num_sessions=len(progress.sessions),
         mastered_concepts=progress.mastered_concepts,
         needs_work_concepts=progress.needs_work_concepts,
+        subject=progress.subject,
     )
 
     response = ollama.chat(

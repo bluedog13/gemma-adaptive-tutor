@@ -7,7 +7,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
-from src.constants import DATA_DIR, MODEL, SEASON_ORDER
+from src.constants import DATA_DIR, MODEL
 from src.models.schemas import BandInfo, CurriculumResult, ScoreInput, Trend
 
 if TYPE_CHECKING:
@@ -16,21 +16,37 @@ from src.prompts import build_trend_prompt
 
 logger = logging.getLogger("map_accelerator")
 
-_curriculum_cache: dict | None = None
+_curriculum_cache: dict[str, dict] = {}
 
 
-def _load_curriculum() -> dict:
+def _load_curriculum(subject: str = "math") -> dict:
+    """Load and cache the RIT-to-concept mapping for a subject.
+
+    :param subject: One of ``"math"``, ``"reading"``, ``"science"``.
+    :return: Parsed JSON curriculum dict.
+    :raises ValueError: If *subject* is not supported or data file is missing.
+    """
+    from src.constants import SUBJECTS
+
+    if subject not in SUBJECTS:
+        raise ValueError(
+            f"Unsupported subject '{subject}'. Must be one of: {SUBJECTS}"
+        )
     global _curriculum_cache
-    if _curriculum_cache is None:
-        path = DATA_DIR / "rit_to_concept_math_2plus.json"
+    if subject not in _curriculum_cache:
+        path = DATA_DIR / f"rit_to_concept_{subject}_2plus.json"
+        if not path.exists():
+            raise ValueError(
+                f"Curriculum data file not found for subject '{subject}': {path}"
+            )
         with open(path) as f:
-            _curriculum_cache = json.load(f)
-    return _curriculum_cache
+            _curriculum_cache[subject] = json.load(f)
+    return _curriculum_cache[subject]
 
 
-def _score_to_band_key(rit_score: int) -> str | None:
+def _score_to_band_key(rit_score: int, subject: str = "math") -> str | None:
     """Find the band key (e.g. '181-190') that contains this RIT score."""
-    data = _load_curriculum()
+    data = _load_curriculum(subject)
     for band_key in data["bands"]:
         low, high = band_key.split("-")
         if int(low) <= rit_score <= int(high):
@@ -38,9 +54,9 @@ def _score_to_band_key(rit_score: int) -> str | None:
     return None
 
 
-def _next_band_key(band_key: str) -> str | None:
+def _next_band_key(band_key: str, subject: str = "math") -> str | None:
     """Get the band key one level above."""
-    data = _load_curriculum()
+    data = _load_curriculum(subject)
     keys = list(data["bands"].keys())
     try:
         idx = keys.index(band_key)
@@ -51,15 +67,17 @@ def _next_band_key(band_key: str) -> str | None:
     return None
 
 
-def _band_key_to_info(band_key: str) -> BandInfo:
+def _band_key_to_info(band_key: str, subject: str = "math") -> BandInfo:
     """Convert a band dict entry to a BandInfo schema."""
-    data = _load_curriculum()
+    data = _load_curriculum(subject)
     band = data["bands"].get(band_key, {})
     return BandInfo(
         band=band_key,
         building_on_prior=band.get("building_on_prior", []),
         topics=band.get("topics", {}),
-        additional_learning_continuum_topics=band.get("additional_learning_continuum_topics", []),
+        additional_learning_continuum_topics=band.get(
+            "additional_learning_continuum_topics", []
+        ),
     )
 
 
@@ -69,7 +87,9 @@ def _sort_scores(scores: list[ScoreInput]) -> list[ScoreInput]:
     return sorted(scores, key=lambda s: (s.year, _CHRONO[str(s.season.value)]))
 
 
-def _build_timeline(sorted_scores: list[ScoreInput], grade: int = 3) -> str:
+def _build_timeline(
+    sorted_scores: list[ScoreInput], grade: int = 3, subject: str = "math"
+) -> str:
     """Build a readable score timeline with computed metrics."""
     from src.constants import estimate_percentile, NWEA_CONDITIONAL_GROWTH
 
@@ -122,35 +142,33 @@ def _build_timeline(sorted_scores: list[ScoreInput], grade: int = 3) -> str:
                     )
 
         # Fall-to-spring actual vs expected growth comparison
-        # This shows how the student grew vs students who STARTED at the same level nationally
         fall_scores = season_groups.get("fall", [])
         spring_scores = season_groups.get("spring", [])
         if fall_scores and spring_scores:
             timeline += "\n\nActual vs Expected Growth (compared to peers who started at the same level):"
             for fall_s in fall_scores:
-                # Find spring of same school year (same year + 1 for spring)
                 matching_spring = [
-                    sp for sp in spring_scores
-                    if sp.year == fall_s.year + 1
+                    sp for sp in spring_scores if sp.year == fall_s.year + 1
                 ]
                 if not matching_spring:
                     continue
                 spring_s = matching_spring[0]
                 actual_growth = spring_s.rit_score - fall_s.rit_score
 
-                # Estimate which grade this school year was
-                # Fall year = school year start, so grade ~ current_grade - years_back
                 school_year_grade = max(0, min(grade - (last.year - fall_s.year), 5))
                 if str(last.season.value) in ("winter", "spring"):
-                    school_year_grade = max(0, min(grade - (last.year - fall_s.year - 1), 5))
+                    school_year_grade = max(
+                        0, min(grade - (last.year - fall_s.year - 1), 5)
+                    )
 
-                # Get starting percentile and expected growth
-                fall_pct = estimate_percentile(fall_s.rit_score, school_year_grade, "fall")
-                cond_growth = NWEA_CONDITIONAL_GROWTH.get(
-                    school_year_grade, NWEA_CONDITIONAL_GROWTH.get(3, {})
+                fall_pct = estimate_percentile(
+                    fall_s.rit_score, school_year_grade, "fall", subject
+                )
+                cond_growth = NWEA_CONDITIONAL_GROWTH[subject].get(
+                    school_year_grade,
+                    NWEA_CONDITIONAL_GROWTH[subject].get(3, {}),
                 )
 
-                # Find expected growth for nearest percentile bracket
                 pct_brackets = sorted(cond_growth.keys())
                 nearest_bracket = min(pct_brackets, key=lambda p: abs(p - fall_pct))
                 expected = cond_growth[nearest_bracket]
@@ -171,7 +189,9 @@ def _build_timeline(sorted_scores: list[ScoreInput], grade: int = 3) -> str:
     return timeline
 
 
-def detect_trend(scores: list[ScoreInput], grade: int = 3) -> tuple[Trend | None, str | None]:
+def detect_trend(
+    scores: list[ScoreInput], grade: int = 3, subject: str = "math"
+) -> tuple[Trend | None, str | None]:
     """Use Gemma 4 to analyze growth trend from MAP scores."""
     if len(scores) < 2:
         logger.info("detect_trend: skipping — fewer than 2 scores")
@@ -180,14 +200,24 @@ def detect_trend(scores: list[ScoreInput], grade: int = 3) -> tuple[Trend | None
     import ollama
 
     sorted_scores = _sort_scores(scores)
-    timeline = _build_timeline(sorted_scores, grade)
+    timeline = _build_timeline(sorted_scores, grade, subject)
     latest = sorted_scores[-1]
     latest_rit = latest.rit_score
-    latest_season = str(latest.season.value) if hasattr(latest.season, "value") else str(latest.season)
+    latest_season = (
+        str(latest.season.value)
+        if hasattr(latest.season, "value")
+        else str(latest.season)
+    )
 
-    logger.info("detect_trend: grade=%s, latest_rit=%s, season=%s, timeline=%s", grade, latest_rit, latest_season, timeline)
+    logger.info(
+        "detect_trend: grade=%s, latest_rit=%s, season=%s, subject=%s",
+        grade,
+        latest_rit,
+        latest_season,
+        subject,
+    )
 
-    prompt = build_trend_prompt(grade, timeline, latest_rit, latest_season)
+    prompt = build_trend_prompt(grade, timeline, latest_rit, latest_season, subject)
 
     logger.info("detect_trend: calling Gemma 4 (%s)...", MODEL)
     response = ollama.chat(
@@ -205,10 +235,14 @@ def detect_trend(scores: list[ScoreInput], grade: int = 3) -> tuple[Trend | None
         parsed = json.loads(raw)
     except json.JSONDecodeError as e:
         logger.warning("detect_trend: JSON parse failed (%s), attempting repair", e)
-        # Common issue: unescaped control chars or nested quotes in values
-        # Try extracting individual fields with regex
         parsed = {}
-        for key in ("trend", "where_they_stand", "growth_pattern", "what_this_means", "recommendation"):
+        for key in (
+            "trend",
+            "where_they_stand",
+            "growth_pattern",
+            "what_this_means",
+            "recommendation",
+        ):
             m = re.search(rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
             if m:
                 parsed[key] = m.group(1)
@@ -222,7 +256,6 @@ def detect_trend(scores: list[ScoreInput], grade: int = 3) -> tuple[Trend | None
     trend_value = parsed.get("trend", "stalling")
     trend = Trend(trend_value)
 
-    # Build bullet-point analysis from structured fields
     bullets = []
     if parsed.get("where_they_stand"):
         bullets.append(f"- **Where they stand:** {parsed['where_they_stand']}")
@@ -238,19 +271,23 @@ def detect_trend(scores: list[ScoreInput], grade: int = 3) -> tuple[Trend | None
 
 
 def get_cached_analysis(
-    student_id: int, db: "Session"
+    student_id: int, db: "Session", subject: str = "math"
 ) -> CurriculumResult | None:
     """Load cached analysis from DB if it exists.
 
     :param student_id: Student primary key.
     :param db: SQLAlchemy session.
+    :param subject: Subject to look up.
     :return: CurriculumResult or None if no cache.
     """
     from src.models.database import StudentAnalysis
 
     row = (
         db.query(StudentAnalysis)
-        .filter(StudentAnalysis.student_id == student_id)
+        .filter(
+            StudentAnalysis.student_id == student_id,
+            StudentAnalysis.subject == subject,
+        )
         .first()
     )
     if row is None:
@@ -265,23 +302,28 @@ def get_cached_analysis(
         introduce_band=introduce,
         trend=trend,
         trend_detail=row.trend_detail,
+        subject=subject,
     )
 
 
 def get_cached_scores_hash(
-    student_id: int, db: "Session"
+    student_id: int, db: "Session", subject: str = "math"
 ) -> str | None:
     """Return the scores_hash for a cached analysis, or None.
 
     :param student_id: Student primary key.
     :param db: SQLAlchemy session.
+    :param subject: Subject to look up.
     :return: Hex digest string or None.
     """
     from src.models.database import StudentAnalysis
 
     row = (
         db.query(StudentAnalysis)
-        .filter(StudentAnalysis.student_id == student_id)
+        .filter(
+            StudentAnalysis.student_id == student_id,
+            StudentAnalysis.subject == subject,
+        )
         .first()
     )
     return row.scores_hash if row else None
@@ -293,14 +335,16 @@ def save_analysis_cache(
     scores_hash: str,
     grade: int,
     db: "Session",
+    subject: str = "math",
 ) -> None:
-    """Upsert a StudentAnalysis row for the given student.
+    """Upsert a StudentAnalysis row for the given student and subject.
 
     :param student_id: Student primary key.
     :param curriculum_result: The analysis result to cache.
     :param scores_hash: SHA-256 hash of current scores.
     :param grade: Student grade.
     :param db: SQLAlchemy session.
+    :param subject: Subject for this analysis.
     """
     from datetime import datetime, timezone
 
@@ -308,7 +352,10 @@ def save_analysis_cache(
 
     row = (
         db.query(StudentAnalysis)
-        .filter(StudentAnalysis.student_id == student_id)
+        .filter(
+            StudentAnalysis.student_id == student_id,
+            StudentAnalysis.subject == subject,
+        )
         .first()
     )
     values = {
@@ -327,17 +374,22 @@ def save_analysis_cache(
         for k, v in values.items():
             setattr(row, k, v)
     else:
-        row = StudentAnalysis(student_id=student_id, **values)
+        row = StudentAnalysis(student_id=student_id, subject=subject, **values)
         db.add(row)
     db.commit()
 
 
-def map_rit_to_curriculum(rit_score: int, scores: list[ScoreInput] | None = None, grade: int = 3) -> CurriculumResult:
+def map_rit_to_curriculum(
+    rit_score: int,
+    scores: list[ScoreInput] | None = None,
+    grade: int = 3,
+    subject: str = "math",
+) -> CurriculumResult:
     """Map a RIT score to its Develop and Introduce bands."""
-    develop_key = _score_to_band_key(rit_score)
+    develop_key = _score_to_band_key(rit_score, subject)
 
     if develop_key is None:
-        data = _load_curriculum()
+        data = _load_curriculum(subject)
         keys = list(data["bands"].keys())
         first_low = int(keys[0].split("-")[0])
 
@@ -346,16 +398,19 @@ def map_rit_to_curriculum(rit_score: int, scores: list[ScoreInput] | None = None
         else:
             develop_key = keys[-1]
 
-    introduce_key = _next_band_key(develop_key)
+    introduce_key = _next_band_key(develop_key, subject)
     if introduce_key is None:
         introduce_key = develop_key
 
-    trend, trend_detail = detect_trend(scores, grade) if scores else (None, None)
+    trend, trend_detail = (
+        detect_trend(scores, grade, subject) if scores else (None, None)
+    )
 
     return CurriculumResult(
         rit_score=rit_score,
-        develop_band=_band_key_to_info(develop_key),
-        introduce_band=_band_key_to_info(introduce_key),
+        develop_band=_band_key_to_info(develop_key, subject),
+        introduce_band=_band_key_to_info(introduce_key, subject),
         trend=trend,
         trend_detail=trend_detail,
+        subject=subject,
     )

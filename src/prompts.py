@@ -6,17 +6,28 @@ from src.constants import (
     estimate_percentile,
     get_percentile_cutoffs,
 )
+from src.models.schemas import SUBJECT_DISPLAY
 
 
-def _build_norms_context(grade: int, latest_rit: int, season: str = "fall") -> str:
+def _build_norms_context(
+    grade: int, latest_rit: int, season: str = "fall", subject: str = "math"
+) -> str:
     """Build NWEA norms context string for prompts."""
-    means = NWEA_MEAN_RIT.get(grade, NWEA_MEAN_RIT[3])
-    season_pcts = get_percentile_cutoffs(grade, season)
-    cond_growth = NWEA_CONDITIONAL_GROWTH.get(grade, NWEA_CONDITIONAL_GROWTH[3])
-    pct = estimate_percentile(latest_rit, grade, season)
+    subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
+    if subject not in NWEA_MEAN_RIT:
+        raise ValueError(
+            f"No NWEA norms data for subject '{subject}'. "
+            f"Available: {list(NWEA_MEAN_RIT.keys())}"
+        )
+    means = NWEA_MEAN_RIT[subject].get(grade, NWEA_MEAN_RIT[subject][3])
+    season_pcts = get_percentile_cutoffs(grade, season, subject)
+    cond_growth = NWEA_CONDITIONAL_GROWTH[subject].get(
+        grade, NWEA_CONDITIONAL_GROWTH[subject][3]
+    )
+    pct = estimate_percentile(latest_rit, grade, season, subject)
 
-    return f"""NWEA 2025 National Norms for Grade {grade} Math:
-- Mean RIT: Fall {means['fall']}, Winter {means['winter']}, Spring {means['spring']}
+    return f"""NWEA 2025 National Norms for Grade {grade} {subject_display}:
+- Mean RIT: Fall {means["fall"]}, Winter {means["winter"]}, Spring {means["spring"]}
 - Percentile cutoffs ({season.capitalize()}): 25th={season_pcts[25]}, 50th={season_pcts[50]}, 75th={season_pcts[75]}, 90th={season_pcts[90]}, 95th={season_pcts[95]}
 - This student's latest RIT {latest_rit} ({season.capitalize()}) is approximately at the {pct}th percentile
 
@@ -38,13 +49,20 @@ Key research findings (NWEA, Fordham Institute, Northwestern CTD):
 - Growing below expected for your starting percentile = falling behind similar-ability peers nationally, even if the raw score is still high"""
 
 
-def build_trend_prompt(grade: int, timeline: str, latest_rit: int, season: str = "fall") -> str:
+def build_trend_prompt(
+    grade: int,
+    timeline: str,
+    latest_rit: int,
+    season: str = "fall",
+    subject: str = "math",
+) -> str:
     """Build the trend analysis prompt for Gemma 4."""
-    norms_context = _build_norms_context(grade, latest_rit, season)
+    subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
+    norms_context = _build_norms_context(grade, latest_rit, season, subject)
 
     return f"""You are an educational data analyst specializing in MAP (NWEA) assessment data.
 
-A grade {grade} student has the following MAP Math RIT scores:
+A grade {grade} student has the following MAP {subject_display} RIT scores:
 {timeline}
 
 {norms_context}
@@ -72,6 +90,39 @@ Analyze this student's trajectory. Respond with ONLY a JSON object with these ex
 JSON:"""
 
 
+_EXERCISE_TYPE_GUIDANCE: dict[str, str] = {
+    "math": (
+        "- Mix of question types: word_problem, multiple_choice, fill_in_the_blank\n"
+        "- Multiple choice questions should have exactly 4 choices\n"
+        "- Each question should test ONE concept\n"
+        "- Include a clear, step-by-step explanation for each answer\n"
+        "- Make word problems relatable to a child's everyday life"
+    ),
+    "reading": (
+        "- Mix of question types: passage_comprehension, multiple_choice, fill_in_the_blank\n"
+        "- For passage_comprehension, include a short age-appropriate passage (3-5 sentences) followed by a question\n"
+        "- Multiple choice questions should have exactly 4 choices\n"
+        "- Include vocabulary-in-context questions where appropriate\n"
+        "- Include a clear explanation for each answer, referencing the text\n"
+        "- Use engaging, age-appropriate passages about topics kids enjoy"
+    ),
+    "science": (
+        "- Mix of question types: concept_question, multiple_choice, experiment_scenario\n"
+        "- For experiment_scenario, describe a simple experiment and ask about predictions, variables, or conclusions\n"
+        "- Multiple choice questions should have exactly 4 choices\n"
+        "- Include diagram interpretation questions when relevant (describe the diagram in text)\n"
+        "- Include a clear, step-by-step explanation for each answer\n"
+        "- Connect concepts to real-world observations kids can relate to"
+    ),
+}
+
+_TUTOR_ROLE: dict[str, str] = {
+    "math": "math tutor",
+    "reading": "reading and language arts tutor",
+    "science": "science tutor",
+}
+
+
 def build_exercise_prompt(
     student_name: str,
     grade: int,
@@ -79,33 +130,39 @@ def build_exercise_prompt(
     all_concepts: list[str],
     num_questions: int = 5,
     weak_concepts: list[str] | None = None,
+    subject: str = "math",
 ) -> str:
     """Build the exercise generation prompt for Gemma 4."""
+    subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
+    if subject not in _TUTOR_ROLE:
+        raise ValueError(
+            f"No tutor role defined for subject '{subject}'. "
+            f"Available: {list(_TUTOR_ROLE.keys())}"
+        )
+    tutor_role = _TUTOR_ROLE[subject]
+    type_guidance = _EXERCISE_TYPE_GUIDANCE[subject]
+
     focus_note = ""
     if weak_concepts:
         focus_note = f"\nFocus more questions on these concepts the student is struggling with: {', '.join(weak_concepts)}"
 
-    return f"""You are a math tutor for a grade {grade} student named {student_name}.
+    return f"""You are a {tutor_role} for a grade {grade} student named {student_name}.
 
-Generate exactly {num_questions} math practice exercises for the following concepts from RIT band {band_name}:
+Generate exactly {num_questions} {subject_display} practice exercises for the following concepts from RIT band {band_name}:
 
 Concepts to cover:
-{chr(10).join(f'- {c}' for c in all_concepts)}
+{chr(10).join(f"- {c}" for c in all_concepts)}
 {focus_note}
 
 Requirements:
 - Age-appropriate for grade {grade} (ages {grade + 5}-{grade + 6})
-- Mix of question types: word_problem, multiple_choice, fill_in_the_blank
-- Multiple choice questions should have exactly 4 choices
-- Each question should test ONE concept
-- Include a clear, step-by-step explanation for each answer
-- Make word problems relatable to a child's everyday life
+{type_guidance}
 
 Respond with ONLY a JSON array of exercises. Each exercise must have:
 - "concept": the specific concept being tested
 - "topic": the broader topic category
 - "question": the full question text
-- "question_type": one of "word_problem", "multiple_choice", "fill_in_the_blank"
+- "question_type": one of the types listed above
 - "choices": array of 4 options (only for multiple_choice, null otherwise)
 - "correct_answer": the correct answer as a string
 - "explanation": step-by-step explanation of how to solve it
@@ -121,19 +178,24 @@ def build_report_prompt(
     num_sessions: int,
     mastered_concepts: list[str],
     needs_work_concepts: list[str],
+    subject: str = "math",
 ) -> str:
     """Build the progress report prompt for Gemma 4."""
+    subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
+
     return f"""You are writing a brief progress report for a grade {grade} student named {student_name}.
 
+Subject: {subject_display}
+
 Student data:
-- Latest MAP RIT score: {latest_rit}
+- Latest MAP {subject_display} RIT score: {latest_rit}
 - Trend: {trend}
 - Total practice sessions: {num_sessions}
-- Mastered concepts (>=80% correct): {', '.join(mastered_concepts) if mastered_concepts else 'None yet'}
-- Needs more work (<80% correct): {', '.join(needs_work_concepts) if needs_work_concepts else 'None yet'}
+- Mastered concepts (>=80% correct): {", ".join(mastered_concepts) if mastered_concepts else "None yet"}
+- Needs more work (<80% correct): {", ".join(needs_work_concepts) if needs_work_concepts else "None yet"}
 
 Write a 3-4 paragraph report for their teacher or parent that:
-1. Summarizes where the student is and their growth trend
+1. Summarizes where the student is and their growth trend in {subject_display}
 2. Highlights what they've mastered
 3. Recommends specific next steps for concepts that need work
 4. Encourages continued practice
