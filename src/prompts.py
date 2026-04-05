@@ -1,5 +1,7 @@
 """All Gemma 4 prompt templates for MAP Accelerator."""
 
+import re
+
 from src.constants import (
     NWEA_CONDITIONAL_GROWTH,
     NWEA_MEAN_RIT,
@@ -7,6 +9,28 @@ from src.constants import (
     get_percentile_cutoffs,
 )
 from src.models.schemas import SUBJECT_DISPLAY
+
+_MAX_NAME_LENGTH = 60
+
+
+def _sanitize_name(name: str) -> str:
+    """Sanitize a student name for safe prompt interpolation.
+
+    Strips control characters, collapses whitespace, limits length, and
+    removes characters that could be used for prompt injection.
+
+    :param name: Raw student name.
+    :return: Sanitized name safe for embedding in prompts.
+    """
+    # Remove control characters and non-printable chars
+    name = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", name)
+    # Allow letters, numbers, spaces, hyphens, apostrophes, periods
+    name = re.sub(r"[^\w\s\-'.À-ÖØ-öø-ÿ]", "", name)
+    # Collapse whitespace
+    name = re.sub(r"\s+", " ", name).strip()
+    # Truncate
+    name = name[:_MAX_NAME_LENGTH]
+    return name or "Student"
 
 
 def _build_norms_context(
@@ -208,12 +232,15 @@ def build_exercise_prompt(
     student_name: str,
     grade: int,
     band_name: str,
-    all_concepts: list[str],
+    topics: dict[str, list[str]],
     num_questions: int = 5,
     weak_concepts: list[str] | None = None,
     subject: str = "math",
 ) -> str:
-    """Build the exercise generation prompt for Gemma 4."""
+    """Build the exercise generation prompt for Gemma 4.
+
+    :param topics: Mapping of topic name to list of concept strings.
+    """
     subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
     if subject not in _TUTOR_ROLE:
         raise ValueError(
@@ -225,14 +252,26 @@ def build_exercise_prompt(
 
     focus_note = ""
     if weak_concepts:
-        focus_note = f"\nFocus more questions on these concepts the student is struggling with: {', '.join(weak_concepts)}"
+        focus_note = (
+            "\nFocus more questions on these concepts the student is "
+            f"struggling with: {', '.join(weak_concepts)}"
+        )
+
+    # Format concepts grouped under their topic
+    topic_lines: list[str] = []
+    for topic_name, concepts in topics.items():
+        topic_lines.append(f"Topic: {topic_name}")
+        for concept in concepts:
+            topic_lines.append(f"  - {concept}")
+    concepts_block = chr(10).join(topic_lines)
+
+    student_name = _sanitize_name(student_name)
 
     return f"""You are a {tutor_role} for a grade {grade} student named {student_name}.
 
 Generate exactly {num_questions} {subject_display} practice exercises for the following concepts from RIT band {band_name}:
 
-Concepts to cover:
-{chr(10).join(f"- {c}" for c in all_concepts)}
+{concepts_block}
 {focus_note}
 
 Requirements:
@@ -241,8 +280,8 @@ Requirements:
 {type_guidance}
 
 Respond with ONLY a JSON array of exercises. Each exercise must have these REQUIRED fields:
-- "concept": the specific concept being tested
-- "topic": the broader topic category
+- "concept": the specific concept being tested (use EXACTLY a concept name from the list above, do NOT include the topic name)
+- "topic": the broader topic category (use EXACTLY a Topic name from the list above)
 - "question": the full question text (do NOT put passage/scenario text here)
 - "question_type": one of "multiple_choice", "multi_select", "fill_in_the_blank", "two_part", "sequence_order", "table_matching"
 - "choices": array of 4+ options (for MC/multi_select/two_part Part A, null for fill_in_the_blank)
@@ -276,6 +315,8 @@ def build_report_prompt(
 ) -> str:
     """Build the progress report prompt for Gemma 4."""
     subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
+
+    student_name = _sanitize_name(student_name)
 
     return f"""You are writing a brief progress report for a grade {grade} student named {student_name}.
 
