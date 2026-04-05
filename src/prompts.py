@@ -92,28 +92,108 @@ JSON:"""
 
 _EXERCISE_TYPE_GUIDANCE: dict[str, str] = {
     "math": (
-        "- Most questions must be multiple_choice with exactly 4 choices\n"
-        "- You may include 1-2 fill_in_the_blank questions where the answer is a single number or short expression\n"
-        "- Every question MUST end with a clear question sentence (e.g. 'What is the value of x?', 'How many apples are left?')\n"
-        "- Each question should test ONE concept\n"
-        "- Include a clear, step-by-step explanation for each answer\n"
-        "- Make word problems relatable to a child's everyday life"
+        "Use a MIX of these MAP-style question types (vary across questions):\n"
+        "\n"
+        "1. **multiple_choice** — Standard 4-option MC. Set question_type to "
+        '"multiple_choice", provide "choices" (4 items), "correct_answer".\n'
+        "   - For visual questions (coins, base-10 blocks, arrays, shapes), "
+        "DESCRIBE the visual in the question text. Example: "
+        '"A set of base-10 blocks shows 4 hundreds flats, 3 tens rods, '
+        'and 2 ones cubes. What number do the blocks represent?"\n'
+        "\n"
+        '2. **multi_select** — "Choose all that apply" or "Choose two". '
+        'Set question_type to "multi_select", provide "choices" (4-6 items), '
+        '"num_correct" (how many to pick), "correct_answers" (list of correct '
+        "choices). Set correct_answer to the first correct answer.\n"
+        "\n"
+        "3. **fill_in_the_blank** — Single numeric or short answer. "
+        'Set question_type to "fill_in_the_blank", choices=null.\n'
+        "\n"
+        "4. **two_part** — Error analysis or two-step reasoning. "
+        "Part A asks what went wrong or for a first answer. "
+        "Part B asks for the correct answer or supporting evidence. "
+        'Set question_type to "two_part", provide "choices" for Part A, '
+        '"part_b_question", "part_b_choices", "part_b_correct". '
+        "correct_answer is the Part A answer.\n"
+        "\n"
+        "Rules:\n"
+        "- Each question tests ONE concept\n"
+        "- Every question ends with a clear question sentence\n"
+        "- Include a step-by-step explanation for each answer\n"
+        "- Make word problems relatable to a child's everyday life\n"
+        "- Aim for roughly: 2 multiple_choice, 1 multi_select or two_part, "
+        "1 fill_in_the_blank, 1 of any type"
     ),
     "reading": (
-        "- ALL questions must be multiple_choice with exactly 4 choices\n"
-        "- Most questions should include a short age-appropriate passage (3-5 sentences) followed by a question about it\n"
-        "- Every question MUST end with a clear question sentence (e.g. 'What is the main idea of this passage?', 'What does the word ___ mean in this sentence?')\n"
+        "Use a MIX of these MAP-style question types (vary across questions):\n"
+        "\n"
+        'ALL reading questions MUST include a "scenario" field with a '
+        "4-8 sentence age-appropriate passage. The passage goes in the "
+        '"scenario" field, NOT in the "question" field.\n'
+        "\n"
+        "1. **multiple_choice** — Standard passage + MC. Set question_type "
+        'to "multiple_choice", provide "scenario" (passage), "choices" '
+        "(4 items), correct_answer.\n"
+        "\n"
+        '2. **two_part** — Part A/Part B (e.g., "What is the lesson?" then '
+        '"Which detail supports your answer?"). Set question_type to '
+        '"two_part", provide "scenario" (passage), "choices" for Part A, '
+        '"part_b_question", "part_b_choices", "part_b_correct". '
+        "correct_answer is the Part A answer.\n"
+        "\n"
+        '3. **multi_select** — "Choose two details that support..." '
+        'Set question_type to "multi_select", provide "scenario", '
+        '"choices" (4-6 items), "num_correct", "correct_answers".\n'
+        "\n"
+        "4. **sequence_order** — Procedural text with steps to order. "
+        'Set question_type to "sequence_order", provide "scenario", '
+        '"items_to_order" (shuffled list), "correct_order" (correct list). '
+        "correct_answer = comma-joined correct order.\n"
+        "\n"
+        "Rules:\n"
+        "- EVERY question must have a scenario (passage)\n"
+        "- Use engaging, age-appropriate passages about topics kids enjoy\n"
         "- Include vocabulary-in-context questions where appropriate\n"
-        "- Include a clear explanation for each answer, referencing the text\n"
-        "- Use engaging, age-appropriate passages about topics kids enjoy"
+        "- Explanations should reference the text\n"
+        "- Aim for roughly: 2 multiple_choice, 1 two_part, 1 multi_select, "
+        "1 of any type"
     ),
     "science": (
-        "- ALL questions must be multiple_choice with exactly 4 choices\n"
-        "- Include experiment scenarios where you describe a simple experiment and ask about predictions, variables, or conclusions\n"
-        "- Every question MUST end with a clear question sentence (e.g. 'What would most likely happen?', 'Which best explains why...?')\n"
-        "- Include diagram interpretation questions when relevant (describe the diagram in text)\n"
-        "- Include a clear, step-by-step explanation for each answer\n"
-        "- Connect concepts to real-world observations kids can relate to"
+        "Use a MIX of these MAP-style question types (vary across questions):\n"
+        "\n"
+        'ALL science questions MUST include a "scenario" field describing '
+        "an experiment, observation, or real-world situation. The scenario "
+        'goes in the "scenario" field, NOT in the "question" field.\n'
+        "\n"
+        "1. **multiple_choice** — Scenario + standard MC. Set question_type "
+        'to "multiple_choice", provide "scenario", "choices" (4 items), '
+        "correct_answer.\n"
+        "\n"
+        '2. **multi_select** — "Which two designs would reduce warming?" '
+        'Set question_type to "multi_select", provide "scenario", '
+        '"choices" (4-6 items), "num_correct", "correct_answers".\n'
+        "\n"
+        "3. **table_matching** — Before/after, cause/effect, or "
+        'classification. Set question_type to "table_matching", provide '
+        '"scenario", "match_pairs" (dict mapping item to correct category), '
+        '"match_options" (list of category labels). '
+        "correct_answer = summary of correct pairs.\n"
+        "\n"
+        "4. **sequence_order** — Life cycle stages, process steps. "
+        'Set question_type to "sequence_order", provide "scenario", '
+        '"items_to_order" (shuffled), "correct_order" (correct sequence). '
+        "correct_answer = comma-joined correct order.\n"
+        "\n"
+        "5. **multiple_choice** with pattern prediction — Describe a pattern "
+        "(e.g., moon phases, seasons) and ask what comes next.\n"
+        "\n"
+        "Rules:\n"
+        "- EVERY question must have a scenario\n"
+        "- Describe diagrams, tables, and visuals in text\n"
+        "- Include step-by-step explanations\n"
+        "- Connect concepts to real-world observations kids relate to\n"
+        "- Aim for roughly: 2 multiple_choice, 1 multi_select or "
+        "table_matching, 1 sequence_order, 1 of any type"
     ),
 }
 
@@ -157,16 +237,29 @@ Concepts to cover:
 
 Requirements:
 - Age-appropriate for grade {grade} (ages {grade + 5}-{grade + 6})
+- NEVER use LaTeX, MathJax, or dollar-sign math notation (e.g., $\\frac{{3}}{{10}}$). Write fractions as plain text like "3/10", exponents as "2^3", and symbols as words or Unicode (e.g., "x", ">=", "+")
 {type_guidance}
 
-Respond with ONLY a JSON array of exercises. Each exercise must have:
+Respond with ONLY a JSON array of exercises. Each exercise must have these REQUIRED fields:
 - "concept": the specific concept being tested
 - "topic": the broader topic category
-- "question": the full question text
-- "question_type": one of the types listed above
-- "choices": array of 4 options (only for multiple_choice, null otherwise)
+- "question": the full question text (do NOT put passage/scenario text here)
+- "question_type": one of "multiple_choice", "multi_select", "fill_in_the_blank", "two_part", "sequence_order", "table_matching"
+- "choices": array of 4+ options (for MC/multi_select/two_part Part A, null for fill_in_the_blank)
 - "correct_answer": the correct answer as a string
 - "explanation": step-by-step explanation of how to solve it
+
+OPTIONAL fields (include when the question type needs them):
+- "scenario": passage or scenario text shown above the question (REQUIRED for reading and science)
+- "num_correct": integer, how many to pick (for multi_select)
+- "correct_answers": array of correct answer strings (for multi_select)
+- "part_b_question": Part B question text (for two_part)
+- "part_b_choices": array of Part B options (for two_part)
+- "part_b_correct": correct Part B answer string (for two_part)
+- "items_to_order": array of shuffled items (for sequence_order)
+- "correct_order": array in correct sequence (for sequence_order)
+- "match_pairs": object mapping item to correct category (for table_matching)
+- "match_options": array of category labels (for table_matching)
 
 JSON array:"""
 

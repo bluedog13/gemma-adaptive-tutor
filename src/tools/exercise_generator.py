@@ -9,6 +9,13 @@ from src.models.schemas import BandInfo, Exercise, ExerciseSet, StudentProgress
 from src.prompts import build_exercise_prompt, build_report_prompt
 
 
+def _normalize_list(raw: list | None) -> list[str] | None:
+    """Normalize a list field from Gemma — flatten nested lists, stringify."""
+    if not raw or not isinstance(raw, list):
+        return None
+    return [str(c[0]) if isinstance(c, list) else str(c) for c in raw]
+
+
 def generate_exercises(
     student_name: str,
     grade: int,
@@ -56,21 +63,41 @@ def generate_exercises(
     for ex in exercises_data:
         # Normalize choices — Gemma sometimes returns nested lists
         raw_choices = ex.get("choices")
-        choices = None
-        if raw_choices and isinstance(raw_choices, list):
-            choices = [
-                str(c[0]) if isinstance(c, list) else str(c) for c in raw_choices
-            ]
+        choices = _normalize_list(raw_choices)
+
+        # Normalize other list fields
+        part_b_choices = _normalize_list(ex.get("part_b_choices"))
+        correct_answers = _normalize_list(ex.get("correct_answers"))
+        items_to_order = _normalize_list(ex.get("items_to_order"))
+        correct_order = _normalize_list(ex.get("correct_order"))
+
+        # Normalize match fields
+        match_pairs = ex.get("match_pairs")
+        if match_pairs and not isinstance(match_pairs, dict):
+            match_pairs = None
+        match_options = _normalize_list(ex.get("match_options"))
 
         exercises.append(
             Exercise(
                 concept=ex.get("concept", ""),
                 topic=ex.get("topic", ""),
                 question=ex.get("question", ""),
-                question_type=ex.get("question_type", "word_problem"),
+                question_type=ex.get("question_type", "multiple_choice"),
                 choices=choices,
                 correct_answer=str(ex.get("correct_answer", "")),
                 explanation=ex.get("explanation", ""),
+                scenario=ex.get("scenario"),
+                num_correct=ex.get("num_correct"),
+                correct_answers=correct_answers,
+                part_b_question=ex.get("part_b_question"),
+                part_b_choices=part_b_choices,
+                part_b_correct=(
+                    str(ex["part_b_correct"]) if ex.get("part_b_correct") else None
+                ),
+                items_to_order=items_to_order,
+                correct_order=correct_order,
+                match_pairs=match_pairs,
+                match_options=match_options,
             )
         )
 

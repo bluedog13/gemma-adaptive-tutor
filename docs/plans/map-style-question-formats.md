@@ -1,6 +1,6 @@
 # Plan: MAP-Style Question Formats for Exercise Generator
 
-**Status:** Draft
+**Status:** Done
 **Reference screenshots:** `assets/images/math/`, `assets/images/language arts reading/`, `assets/images/science/`
 
 ## Context

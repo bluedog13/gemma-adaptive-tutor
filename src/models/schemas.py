@@ -77,11 +77,32 @@ class Exercise(BaseModel):
     concept: str
     topic: str
     question: str
-    question_type: str  # "word_problem", "multiple_choice", "fill_in_the_blank"
-    choices: list[str] | None = None  # for multiple choice
+    question_type: str  # "multiple_choice", "multi_select", "fill_in_the_blank",
+    # "two_part", "sequence_order", "table_matching"
+    choices: list[str] | None = None  # for multiple choice / multi-select
     correct_answer: str
     explanation: str
     difficulty: str = "introduce"  # reinforce, develop, introduce
+
+    # Multi-select ("Choose two")
+    num_correct: int | None = None
+    correct_answers: list[str] | None = None
+
+    # Two-part / error analysis (Part A + Part B)
+    part_b_question: str | None = None
+    part_b_choices: list[str] | None = None
+    part_b_correct: str | None = None
+
+    # Sequence ordering
+    items_to_order: list[str] | None = None
+    correct_order: list[str] | None = None
+
+    # Table matching
+    match_pairs: dict[str, str] | None = None
+    match_options: list[str] | None = None
+
+    # Scenario / passage context
+    scenario: str | None = None
 
 
 class ExerciseSet(BaseModel):
