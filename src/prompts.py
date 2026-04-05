@@ -92,24 +92,25 @@ JSON:"""
 
 _EXERCISE_TYPE_GUIDANCE: dict[str, str] = {
     "math": (
-        "- Mix of question types: word_problem, multiple_choice, fill_in_the_blank\n"
-        "- Multiple choice questions should have exactly 4 choices\n"
+        "- Most questions must be multiple_choice with exactly 4 choices\n"
+        "- You may include 1-2 fill_in_the_blank questions where the answer is a single number or short expression\n"
+        "- Every question MUST end with a clear question sentence (e.g. 'What is the value of x?', 'How many apples are left?')\n"
         "- Each question should test ONE concept\n"
         "- Include a clear, step-by-step explanation for each answer\n"
         "- Make word problems relatable to a child's everyday life"
     ),
     "reading": (
-        "- Mix of question types: passage_comprehension, multiple_choice, fill_in_the_blank\n"
-        "- For passage_comprehension, include a short age-appropriate passage (3-5 sentences) followed by a question\n"
-        "- Multiple choice questions should have exactly 4 choices\n"
+        "- ALL questions must be multiple_choice with exactly 4 choices\n"
+        "- Most questions should include a short age-appropriate passage (3-5 sentences) followed by a question about it\n"
+        "- Every question MUST end with a clear question sentence (e.g. 'What is the main idea of this passage?', 'What does the word ___ mean in this sentence?')\n"
         "- Include vocabulary-in-context questions where appropriate\n"
         "- Include a clear explanation for each answer, referencing the text\n"
         "- Use engaging, age-appropriate passages about topics kids enjoy"
     ),
     "science": (
-        "- Mix of question types: concept_question, multiple_choice, experiment_scenario\n"
-        "- For experiment_scenario, describe a simple experiment and ask about predictions, variables, or conclusions\n"
-        "- Multiple choice questions should have exactly 4 choices\n"
+        "- ALL questions must be multiple_choice with exactly 4 choices\n"
+        "- Include experiment scenarios where you describe a simple experiment and ask about predictions, variables, or conclusions\n"
+        "- Every question MUST end with a clear question sentence (e.g. 'What would most likely happen?', 'Which best explains why...?')\n"
         "- Include diagram interpretation questions when relevant (describe the diagram in text)\n"
         "- Include a clear, step-by-step explanation for each answer\n"
         "- Connect concepts to real-world observations kids can relate to"

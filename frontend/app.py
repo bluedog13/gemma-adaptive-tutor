@@ -1,5 +1,6 @@
 """Gradio frontend for MAP Accelerator."""
 
+import html
 import logging
 import re
 import traceback
@@ -884,13 +885,12 @@ def register_student(
         db.close()
 
 
-def start_practice(
-    student_id, num_questions, pstate, subject="math", progress=gr.Progress()
-):
+def start_practice(student_id, num_questions, pstate, subject="math"):
     """Generate exercises and start a practice session.
 
     :param pstate: Per-client practice state dict (from ``gr.State``).
-    :return: Tuple of (question, answer_box, feedback, submit_btn, updated_pstate).
+    :return: 6-tuple of (question, answer_input, answer_radio, feedback,
+             submit_btn, updated_pstate).
     """
     logger.info(
         "start_practice called: student_id=%s, num_questions=%s, subject=%s",
@@ -901,8 +901,9 @@ def start_practice(
 
     if not student_id:
         return (
-            "**Please go to the Scores tab and register a student first.**",
-            "",
+            "<p><b>Please go to the Scores tab and register a student first.</b></p>",
+            gr.update(visible=False),
+            gr.update(visible=False),
             "",
             gr.update(interactive=False),
             pstate,
@@ -913,14 +914,14 @@ def start_practice(
         student = db.query(Student).filter(Student.id == int(student_id)).first()
         if not student:
             return (
-                "**Student not found.** Please register first.",
-                "",
+                "<p><b>Student not found.</b> Please register first.</p>",
+                gr.update(visible=False),
+                gr.update(visible=False),
                 "",
                 gr.update(interactive=False),
                 pstate,
             )
 
-        progress(0.2, desc="Looking up curriculum bands...")
         scores = (
             db.query(Score)
             .filter(Score.student_id == student.id, Score.subject == subject)
@@ -928,8 +929,9 @@ def start_practice(
         )
         if not scores:
             return (
-                f"**No {SUBJECT_DISPLAY.get(subject, subject)} scores found.** Enter scores first.",
-                "",
+                f"<p><b>No {SUBJECT_DISPLAY.get(subject, subject)} scores found.</b> Enter scores first.</p>",
+                gr.update(visible=False),
+                gr.update(visible=False),
                 "",
                 gr.update(interactive=False),
                 pstate,
@@ -952,7 +954,6 @@ def start_practice(
         weak = _get_weak_concepts(student.id, db, subject)
 
         try:
-            progress(0.4, desc="Gemma 4 E4B generating exercises...")
             exercises = generate_exercises(
                 student_name=student.name,
                 grade=student.grade,
@@ -961,11 +962,11 @@ def start_practice(
                 weak_concepts=weak,
                 subject=subject,
             )
-            progress(0.9, desc="Exercises ready!")
         except Exception as e:
             return (
-                f"**Error generating exercises:** {e}",
-                "",
+                f"<p><b>Error generating exercises:</b> {html.escape(str(e))}</p>",
+                gr.update(visible=False),
+                gr.update(visible=False),
                 "",
                 gr.update(interactive=False),
                 pstate,
@@ -989,54 +990,95 @@ def start_practice(
             "band": curriculum.introduce_band.band,
             "rit": latest.rit_score,
             "results": [],
+            "subject": subject,
         }
 
         result = _format_exercise(0, pstate)
         return (*result, pstate)
     except Exception as e:
         logger.error("start_practice failed: %s", traceback.format_exc())
-        return f"**Error:** {e}", "", "", gr.update(interactive=False), pstate
+        return (
+            f"<p><b>Error:</b> {html.escape(str(e))}</p>",
+            gr.update(visible=False),
+            gr.update(visible=False),
+            "",
+            gr.update(interactive=False),
+            pstate,
+        )
     finally:
         db.close()
 
 
 def _format_exercise(idx: int, pstate: dict):
-    """Format the current exercise for display with enhanced UI."""
+    """Format the current exercise as MAP-styled HTML.
+
+    :return: 5-tuple of (question_html, textbox_update, radio_update,
+             feedback_clear, submit_btn_update). Caller appends pstate.
+    """
     exercises = pstate["exercises"]
     if idx >= len(exercises):
         return _show_results(pstate)
 
     ex = exercises[idx]
     total = len(exercises)
-    band = pstate["band"]
-    progress_html = f'<div style="margin-bottom: 1rem;"><span class="pill pill-primary">Question {idx + 1} of {total}</span>'
-    band_html = f'<span class="pill pill-secondary">RIT Band: {band}</span>'
-    topic_html = f'<span class="pill pill-neutral">{ex["topic"]}</span></div>'
+    subject = pstate.get("subject", "math")
 
-    header = f"{progress_html}{band_html}{topic_html}"
+    concept = html.escape(ex["concept"])
+    question = html.escape(ex["question"]).replace("\n", "<br>")
 
-    question_text = f"{header}\n\n### {ex['concept']}\n\n{ex['question']}\n\n---\n"
+    progress_counter = (
+        f'<div class="map-progress-counter">'
+        f"Question {idx + 1} of {total}</div>"
+    )
+    banner = f'<div class="map-banner">{concept}</div>'
+    question_area = (
+        f'<div class="map-question-area">'
+        f'<p class="map-question-text">{question}</p>'
+        f"</div>"
+        f'<hr class="map-blue-rule">'
+    )
+    question_html = f"{progress_counter}{banner}{question_area}"
 
     if ex.get("question_type") == "multiple_choice" and ex.get("choices"):
-        choices_text = "\n".join(
-            f"  {chr(65 + i)}) {c}" for i, c in enumerate(ex["choices"])
+        choices = []
+        for i, c in enumerate(ex["choices"]):
+            # Strip existing letter/number prefixes Gemma may have added
+            c_stripped = re.sub(r"^[A-Da-d]\.\s*", "", c)
+            c_stripped = re.sub(r"^\d+\.\s*", "", c_stripped)
+            if subject == "reading":
+                label = f"{i + 1}.  {c_stripped}"
+            else:
+                label = f"{chr(65 + i)}.  {c_stripped}"
+            choices.append(label)
+        return (
+            question_html,
+            gr.update(visible=False, value=""),
+            gr.update(
+                choices=choices, value=None, visible=True, interactive=True
+            ),
+            "",
+            gr.update(interactive=True),
         )
-        question_text += f"\n{choices_text}"
     else:
-        question_text += "\n*Type your answer below.*"
+        return (
+            question_html,
+            gr.update(visible=True, value=""),
+            gr.update(visible=False, value=None, choices=[]),
+            "",
+            gr.update(interactive=True),
+        )
 
-    return (
-        question_text,
-        "",  # clear answer box
-        "",  # clear feedback
-        gr.update(interactive=True),  # enable submit button
-    )
 
+def submit_answer(
+    text_answer: str, radio_answer: str | None, pstate: dict
+):
+    """Check the answer and show MAP-styled feedback.
 
-def submit_answer(answer: str, pstate: dict):
-    """Check the answer and show feedback with styled containers.
-
-    :return: Tuple of (question, answer_box, feedback, submit_btn, updated_pstate).
+    :param text_answer: Free-response text from the textbox.
+    :param radio_answer: Selected radio label (e.g. ``"A.  3/4"``), or None.
+    :param pstate: Per-client practice state dict.
+    :return: 6-tuple of (question, answer_input, answer_radio, feedback,
+             submit_btn, updated_pstate).
     """
     exercises = pstate["exercises"]
     idx = pstate["exercise_idx"]
@@ -1045,27 +1087,55 @@ def submit_answer(answer: str, pstate: dict):
         return (*result, pstate)
 
     ex = exercises[idx]
+    is_mc = ex.get("question_type") == "multiple_choice" and ex.get("choices")
 
-    # Simple answer checking
-    student_ans = answer.strip().lower()
+    # Determine active answer from whichever input is visible
+    if is_mc and radio_answer:
+        raw_answer = radio_answer
+    else:
+        raw_answer = text_answer or ""
+
+    student_ans = raw_answer.strip()
     correct_ans = ex["correct_answer"].strip().lower()
 
-    # Normalize for multiple choice
     is_correct = False
     if student_ans:
-        if ex.get("question_type") == "multiple_choice" and ex.get("choices"):
-            letter_map = {
-                chr(65 + i).lower(): c.lower() for i, c in enumerate(ex["choices"])
-            }
-            if student_ans in letter_map:
-                is_correct = letter_map[student_ans] == correct_ans
+        if is_mc and ex.get("choices"):
+            # Parse radio label: "A.  choice text" or "1.  choice text"
+            parts = raw_answer.split(".  ", 1)
+            if len(parts) == 2:
+                prefix = parts[0].strip()
+                choice_text = parts[1].strip().lower()
+                if prefix.isdigit():
+                    # Reading format: "1" -> "a", "2" -> "b", etc.
+                    letter = chr(96 + int(prefix)) if int(prefix) >= 1 else ""
+                else:
+                    letter = prefix.lower()
             else:
-                is_correct = student_ans == correct_ans or student_ans in correct_ans
+                letter = ""
+                choice_text = student_ans.lower()
+
+            letter_map = {
+                chr(65 + i).lower(): c.lower()
+                for i, c in enumerate(ex["choices"])
+            }
+
+            # Four-way grading (plan P1 + numeric prefix)
+            if letter == correct_ans:
+                is_correct = True
+            elif prefix.lower() == correct_ans:
+                # Numeric key match: student picked "2", answer key is "2"
+                is_correct = True
+            elif choice_text == correct_ans:
+                is_correct = True
+            elif letter in letter_map and letter_map[letter] == correct_ans:
+                is_correct = True
         else:
+            student_lower = student_ans.lower()
             is_correct = (
-                student_ans == correct_ans
-                or correct_ans in student_ans
-                or student_ans in correct_ans
+                student_lower == correct_ans
+                or correct_ans in student_lower
+                or student_lower in correct_ans
             )
 
     pstate["results"].append(
@@ -1073,7 +1143,7 @@ def submit_answer(answer: str, pstate: dict):
             "concept": ex["concept"],
             "topic": ex["topic"],
             "question": ex["question"],
-            "student_answer": answer.strip(),
+            "student_answer": student_ans,
             "correct_answer": ex["correct_answer"],
             "is_correct": is_correct,
         }
@@ -1088,32 +1158,53 @@ def submit_answer(answer: str, pstate: dict):
                 concept=ex["concept"],
                 topic=ex["topic"],
                 question=ex["question"],
-                student_answer=answer.strip(),
+                student_answer=student_ans,
                 correct_answer=ex["correct_answer"],
                 is_correct=is_correct,
             )
             db.add(record)
             db.commit()
         except Exception:
-            logger.error("Failed to save answer to DB: %s", traceback.format_exc())
+            logger.error(
+                "Failed to save answer to DB: %s", traceback.format_exc()
+            )
         finally:
             db.close()
 
+    explanation = html.escape(ex["explanation"])
+
     if is_correct:
-        feedback = f'<div class="feedback-correct"><h3>✅ Correct!</h3><p>{ex["explanation"]}</p></div>'
+        feedback = (
+            '<div class="map-feedback-correct">'
+            "<h3>Correct</h3>"
+            f"<p>{explanation}</p>"
+            "</div>"
+        )
     else:
-        feedback = f'<div class="feedback-incorrect"><h3>❌ Not quite.</h3><p><b>Your answer:</b> {answer}<br><b>Correct answer:</b> {ex["correct_answer"]}</p><p style="margin-top:0.5rem;">{ex["explanation"]}</p></div>'
+        safe_answer = html.escape(student_ans)
+        safe_correct = html.escape(ex["correct_answer"])
+        feedback = (
+            '<div class="map-feedback-incorrect">'
+            "<h3>Not quite</h3>"
+            f"<p><b>Your answer:</b> {safe_answer}<br>"
+            f"<b>Correct answer:</b> {safe_correct}</p>"
+            f'<p style="margin-top:0.5rem;">{explanation}</p>'
+            "</div>"
+        )
 
     pstate["exercise_idx"] = idx + 1
 
     if pstate["exercise_idx"] >= len(exercises):
         feedback += (
-            "\n\n---\n\n*Session complete! Click 'Next Question' to see your results.*"
+            '<div class="map-session-complete">'
+            "Session complete — click Next Question to see your results."
+            "</div>"
         )
 
     return (
         gr.update(),  # keep question visible
         gr.update(),  # keep answer visible
+        gr.update(),  # keep radio visible
         feedback,
         gr.update(interactive=True),
         pstate,
@@ -1123,7 +1214,8 @@ def submit_answer(answer: str, pstate: dict):
 def next_question(pstate: dict):
     """Move to the next question or show results.
 
-    :return: Tuple of (question, answer_box, feedback, submit_btn, updated_pstate).
+    :return: 6-tuple of (question, answer_input, answer_radio, feedback,
+             submit_btn, updated_pstate).
     """
     idx = pstate["exercise_idx"]
     if idx >= len(pstate["exercises"]):
@@ -1134,10 +1226,20 @@ def next_question(pstate: dict):
 
 
 def _show_results(pstate: dict):
-    """Show session results summary."""
+    """Show MAP-styled session results.
+
+    :return: 5-tuple (question_html, answer_input, answer_radio, feedback,
+             submit_btn). Caller appends pstate.
+    """
     results = pstate["results"]
     if not results:
-        return "No results yet.", "", "", gr.update(interactive=False)
+        return (
+            "<p>No results yet.</p>",
+            gr.update(visible=False),
+            gr.update(visible=False),
+            "",
+            gr.update(interactive=False),
+        )
 
     correct = sum(1 for r in results if r["is_correct"])
     total = len(results)
@@ -1152,11 +1254,6 @@ def _show_results(pstate: dict):
         concept_scores[c]["total"] += 1
         if r["is_correct"]:
             concept_scores[c]["correct"] += 1
-
-    breakdown = "\n".join(
-        f"  - **{c}**: {d['correct']}/{d['total']} correct"
-        for c, d in concept_scores.items()
-    )
 
     # Update session in DB
     if pstate["session_id"]:
@@ -1179,6 +1276,19 @@ def _show_results(pstate: dict):
         finally:
             db.close()
 
+    # Build breakdown list
+    breakdown_items = ""
+    for c, d in concept_scores.items():
+        safe_c = html.escape(c)
+        status = (
+            "Correct"
+            if d["correct"] == d["total"]
+            else f"{d['correct']}/{d['total']}"
+        )
+        breakdown_items += (
+            f"<li>{safe_c}: {status}</li>"
+        )
+
     # Identify weak concepts for adaptive follow-up
     weak = [
         c
@@ -1187,20 +1297,39 @@ def _show_results(pstate: dict):
     ]
 
     if weak and pct < 100:
-        weak_list = ", ".join(f"**{c}**" for c in weak)
-        follow_up = f"\n\n### Recommended Follow-Up\nYou struggled with {weak_list}. Click **Start Practice** again — the next session will prioritize these concepts."
+        weak_list = ", ".join(html.escape(c) for c in weak)
+        follow_up = (
+            '<div class="map-results-followup">'
+            f"You struggled with {weak_list}. Click <b>Start Practice</b> "
+            "again — the next session will prioritize these concepts."
+            "</div>"
+        )
     else:
-        follow_up = "\n\n### Great Job!\nAll concepts at 80%+ mastery. Try increasing the question count for a challenge!"
+        follow_up = (
+            '<div class="map-results-followup">'
+            "All concepts at 80%+ mastery. Try increasing the question "
+            "count for a challenge!"
+            "</div>"
+        )
 
-    results_text = f"""## Session Complete!
+    results_html = (
+        '<div class="map-results-card">'
+        '<div class="map-banner">Session Complete</div>'
+        f'<div class="map-score-big">{correct}/{total}</div>'
+        f'<div class="map-score-pct">{pct:.0f}% correct</div>'
+        "<h3>Concept Breakdown</h3>"
+        f"<ul>{breakdown_items}</ul>"
+        f"{follow_up}"
+        "</div>"
+    )
 
-**Score: {correct}/{total} ({pct:.0f}%)**
-
-### Concept Breakdown
-{breakdown}
-{follow_up}"""
-
-    return results_text, "", "", gr.update(interactive=False)
+    return (
+        results_html,
+        gr.update(visible=False),
+        gr.update(visible=False),
+        "",
+        gr.update(interactive=False),
+    )
 
 
 def get_progress_report(student_id, subject="math", progress=gr.Progress()):
@@ -1357,6 +1486,68 @@ button.primary:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px
 .concept-chip { background: #e0e7ff; color: #3730a3; font-size: 0.8rem; padding: 3px 10px; border-radius: 8px; font-weight: 600; }
 .trend-list { list-style: none; padding: 0; margin: 0.75rem 0 0 0; display: flex; flex-direction: column; gap: 0.6rem; }
 .trend-item { background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 10px; padding: 0.85rem 1.1rem; color: #374151; font-size: 0.95rem; line-height: 1.6; }
+
+/* === MAP Practice Tab — scoped under #map-practice-wrapper === */
+#map-practice-wrapper { font-family: Arial, Helvetica, sans-serif !important; background: #fff; padding: 1.5rem 0; }
+#map-practice-wrapper * { font-family: Arial, Helvetica, sans-serif !important; }
+#map-practice-wrapper > div { margin-bottom: 1rem; }
+#map-practice-wrapper .wrap input[type="range"] + .rangeSlider { font-size: 16px !important; }
+#map-practice-wrapper input[type="number"] { font-size: 18px !important; font-weight: 700 !important; width: 3rem !important; }
+#map-practice-wrapper .slider-label span, #map-practice-wrapper label span { font-size: 15px !important; }
+.map-banner { background: #1b6d7c; color: #fff; font-size: 15px; font-weight: 400; padding: 0.6rem 1rem; margin-bottom: 0; line-height: 1.5; }
+.map-question-area { background: #fff; padding: 1.5rem 1.25rem 1rem; }
+.map-question-text { font-size: 16px; color: #333; font-weight: 400; line-height: 1.6; margin: 0; }
+.map-blue-rule { border: none; border-top: 2px solid #3b8bc5; margin: 1rem 0; }
+.map-progress-counter { font-size: 13px; color: #666; text-align: right; margin-bottom: 0.5rem; }
+#map-practice-wrapper .map-radio-choices label {
+    display: flex !important; align-items: center !important;
+    background: #fff !important; border: none !important;
+    border-bottom: 1px solid #e0e0e0 !important; border-radius: 0 !important;
+    padding: 0.7rem 1rem !important; margin-bottom: 0 !important;
+    font-size: 15px !important; color: #333 !important;
+    cursor: pointer !important; line-height: 1.5 !important; gap: 0.5rem !important;
+}
+#map-practice-wrapper .map-radio-choices label:first-child { border-top: 1px solid #e0e0e0 !important; }
+#map-practice-wrapper .map-radio-choices label:hover { background: #f5f8fc !important; }
+#map-practice-wrapper .map-radio-choices input[type="radio"] {
+    width: 18px !important; height: 18px !important;
+    border: 2px solid #3b8bc5 !important; accent-color: #3b8bc5 !important;
+}
+#map-practice-wrapper .map-text-input textarea {
+    font-size: 15px !important; padding: 0.5rem 0.6rem !important;
+    border: 1px solid #333 !important; border-radius: 2px !important;
+    line-height: 1.5 !important; max-width: 200px !important;
+}
+#map-practice-wrapper .map-text-input textarea:focus {
+    border-color: #3b8bc5 !important; outline: 2px solid #3b8bc5 !important;
+}
+#map-practice-wrapper .map-submit-btn {
+    background: #1b6d7c !important; color: #fff !important;
+    font-size: 15px !important; font-weight: 600 !important;
+    padding: 0.6rem 2rem !important; border-radius: 3px !important; border: none !important;
+}
+#map-practice-wrapper .map-submit-btn:hover { background: #155d6a !important; }
+#map-practice-wrapper .map-next-btn {
+    background: #fff !important; color: #1b6d7c !important;
+    border: 1px solid #1b6d7c !important; font-size: 15px !important;
+    font-weight: 600 !important; padding: 0.6rem 2rem !important; border-radius: 3px !important;
+}
+#map-practice-wrapper .map-next-btn:hover { background: #f0f7f8 !important; }
+.map-feedback-correct { background: #f0fdf4; border-left: 3px solid #22c55e; padding: 1rem 1.25rem; margin-top: 1rem; }
+.map-feedback-correct h3 { color: #15803d; font-size: 16px; margin: 0 0 0.4rem 0; font-weight: 700; }
+.map-feedback-correct p { color: #333; font-size: 15px; margin: 0.2rem 0; line-height: 1.6; }
+.map-feedback-incorrect { background: #fef2f2; border-left: 3px solid #ef4444; padding: 1rem 1.25rem; margin-top: 1rem; }
+.map-feedback-incorrect h3 { color: #dc2626; font-size: 16px; margin: 0 0 0.4rem 0; font-weight: 700; }
+.map-feedback-incorrect p { color: #333; font-size: 15px; margin: 0.2rem 0; line-height: 1.6; }
+.map-session-complete { font-size: 14px; color: #1b6d7c; text-align: center; margin-top: 1rem; font-weight: 600; }
+.map-results-card { background: #fff; padding: 1.5rem 1.25rem; line-height: 1.6; }
+.map-results-card h2 { color: #1b6d7c; font-size: 20px; border-bottom: 2px solid #3b8bc5; padding-bottom: 0.5rem; font-weight: 700; }
+.map-score-big { font-size: 42px; font-weight: 700; color: #1b6d7c; text-align: center; margin: 1rem 0 0.25rem 0; }
+.map-score-pct { text-align: center; color: #666; font-size: 15px; margin-bottom: 1rem; }
+.map-results-card h3 { color: #333; font-size: 16px; margin-top: 1.25rem; font-weight: 700; }
+.map-results-card ul { list-style: none; padding: 0; margin: 0; }
+.map-results-card li { padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0; font-size: 15px; color: #333; }
+.map-results-followup { background: #f5f8fc; padding: 1rem 1.25rem; margin-top: 1.25rem; font-size: 15px; color: #333; line-height: 1.6; border-left: 3px solid #1b6d7c; }
 """
 
 custom_css = theme.custom_css
@@ -1605,30 +1796,69 @@ def _build_scores_tab(subject: str, student_id_state, student_dropdown):
 
 
 def _build_practice_tab(subject: str, student_id_state):
-    """Build the Practice sub-tab for a given subject."""
+    """Build the MAP-styled Practice sub-tab for a given subject."""
     practice_state = gr.State(_empty_practice_state())
 
-    with gr.Row():
-        num_q_input = gr.Slider(
-            minimum=3, maximum=10, value=5, step=1, label="Number of Questions", scale=3
+    with gr.Column(elem_id="map-practice-wrapper"):
+        with gr.Row():
+            num_q_input = gr.Slider(
+                minimum=3,
+                maximum=24,
+                value=5,
+                step=1,
+                label="Number of Questions (default: 5)",
+                scale=3,
+                show_label=True,
+            )
+            start_btn = gr.Button(
+                "Start Practice",
+                variant="primary",
+                scale=1,
+                elem_classes=["map-submit-btn"],
+            )
+
+        question_display = gr.HTML(label="Question")
+        answer_radio = gr.Radio(
+            choices=[],
+            label="Select your answer",
+            visible=False,
+            interactive=True,
+            elem_classes=["map-radio-choices"],
         )
-        start_btn = gr.Button("Start Practice", variant="primary", scale=1)
+        answer_input = gr.Textbox(
+            label="Enter the answer in the box.",
+            placeholder="",
+            lines=1,
+            visible=False,
+            elem_classes=["map-text-input"],
+        )
+        with gr.Row(visible=False) as btn_row:
+            submit_btn = gr.Button(
+                "Submit Answer",
+                variant="primary",
+                scale=2,
+                elem_classes=["map-submit-btn"],
+            )
+            next_btn = gr.Button(
+                "Next Question",
+                variant="secondary",
+                scale=1,
+                elem_classes=["map-next-btn"],
+            )
 
-    question_display = gr.Markdown(label="Question")
-    answer_input = gr.Textbox(
-        label="Your Answer", placeholder="Type your answer here...", lines=2
-    )
-    with gr.Row():
-        submit_btn = gr.Button("Submit Answer", variant="primary", scale=2)
-        next_btn = gr.Button("Next Question", variant="secondary", scale=1)
-
-    feedback_display = gr.Markdown(label="Feedback")
+        feedback_display = gr.HTML(label="Feedback", visible=False)
 
     def _start(sid, nq, ps):
         return start_practice(sid, nq, ps, subject=subject)
 
-    def _submit(ans, ps):
-        return submit_answer(ans, ps)
+    def _show_buttons_if_ready(ps):
+        has_exercises = (
+            isinstance(ps, dict) and bool(ps.get("exercises"))
+        )
+        return gr.update(visible=has_exercises)
+
+    def _submit(text_ans, radio_ans, ps):
+        return submit_answer(text_ans, radio_ans, ps)
 
     def _next(ps):
         return next_question(ps)
@@ -1639,18 +1869,25 @@ def _build_practice_tab(subject: str, student_id_state):
         outputs=[
             question_display,
             answer_input,
+            answer_radio,
             feedback_display,
             submit_btn,
             practice_state,
         ],
+    ).then(
+        fn=_show_buttons_if_ready,
+        inputs=[practice_state],
+        outputs=[btn_row],
+        show_progress="hidden",
     )
 
     submit_btn.click(
         fn=_submit,
-        inputs=[answer_input, practice_state],
+        inputs=[answer_input, answer_radio, practice_state],
         outputs=[
             question_display,
             answer_input,
+            answer_radio,
             feedback_display,
             submit_btn,
             practice_state,
@@ -1663,6 +1900,7 @@ def _build_practice_tab(subject: str, student_id_state):
         outputs=[
             question_display,
             answer_input,
+            answer_radio,
             feedback_display,
             submit_btn,
             practice_state,

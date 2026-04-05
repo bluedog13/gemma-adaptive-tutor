@@ -1,6 +1,6 @@
 # Plan: Restyle Practice Tab to Match NWEA MAP Test Interface
 
-**Status:** Draft — updated from actual NWEA MAP screenshots (Math, Reading, Science)  
+**Status:** Done  
 **File:** `frontend/app.py` (single file, all changes)  
 **Reference screenshots:** `assets/images/math/`, `assets/images/language arts reading/`, `assets/images/science/`
 
