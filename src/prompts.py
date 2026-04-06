@@ -321,11 +321,20 @@ def build_report_prompt(
     mastered_concepts: list[str],
     needs_work_concepts: list[str],
     subject: str = "math",
+    session_details: list[str] | None = None,
 ) -> str:
-    """Build the progress report prompt for Gemma 4."""
+    """Build the progress report prompt for Gemma 4.
+
+    :param session_details: one-line summaries per practice session.
+    """
     subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
 
     student_name = _sanitize_name(student_name)
+
+    session_section = ""
+    if session_details:
+        lines = "\n".join(f"- {line}" for line in session_details)
+        session_section = f"\n\nPractice session results:\n{lines}"
 
     return f"""You are writing a brief progress report for a grade {grade} student named {student_name}.
 
@@ -336,12 +345,23 @@ Student data:
 - Trend: {trend}
 - Total practice sessions: {num_sessions}
 - Mastered concepts (>=80% correct): {", ".join(mastered_concepts) if mastered_concepts else "None yet"}
-- Needs more work (<80% correct): {", ".join(needs_work_concepts) if needs_work_concepts else "None yet"}
+- Needs more work (<80% correct): {", ".join(needs_work_concepts) if needs_work_concepts else "None yet"}{session_section}
 
-Write a 3-4 paragraph report for their teacher or parent that:
-1. Summarizes where the student is and their growth trend in {subject_display}
-2. Highlights what they've mastered
-3. Recommends specific next steps for concepts that need work
-4. Encourages continued practice
+Do NOT use placeholder text like "[Parent/Teacher Name]". Start directly with the report content.
+Do NOT repeat the raw data tables — a data dashboard is shown separately above your narrative.
+
+Write a structured progress report for their teacher or parent using this exact format:
+
+**Growth Trajectory**
+One short paragraph interpreting the trend — is the student improving, plateauing, or struggling? Call out specific sessions that show breakthroughs or dips.
+
+**Strengths**
+- One bullet per mastered concept, with a brief note on what it means (e.g., "**Unit cube** — understands 3D volume building blocks")
+
+**Focus Areas**
+- One bullet per concept below 80%, with a concrete, parent-friendly activity suggestion (e.g., "**Rates** — try comparing speeds of toy cars: 'Which car is faster?' builds intuition for rates")
+
+**Next Steps**
+A short encouraging closing paragraph with 1-2 specific recommendations for continued practice.
 
 Keep the tone warm, specific, and actionable. No jargon — a parent should understand it."""

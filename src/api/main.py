@@ -404,6 +404,11 @@ def get_progress(
             else:
                 needs_work.append(concept)
 
+    # Sort sessions chronologically before building summaries
+    sessions = sorted(
+        sessions, key=lambda s: s.completed_at or s.started_at
+    )
+
     session_summaries = [
         SessionSummary(
             session_id=s.id,
@@ -413,7 +418,7 @@ def get_progress(
             correct=s.correct,
             score_pct=s.score_pct,
             concept_scores=s.concept_scores or {},
-            timestamp=s.started_at,
+            timestamp=s.completed_at or s.started_at,
             subject=s.subject,
         )
         for s in sessions

@@ -1,6 +1,6 @@
 # Plan: Kid-Friendly UI Redesign (Playful & Colourful)
 
-**Status:** Done  
+**Status:** In Progress  
 **File:** `frontend/app.py` (single file, all CSS changes)  
 **Prototype:** `prototype_ui.html` (side-by-side before/after, approved by Gautam)
 
@@ -448,6 +448,132 @@ Three CSS rules appended to `theme.custom_css` in `frontend/app.py`. No Python c
 3. Check inner tabs: Scores / Practice / Report are slightly larger and in Fredoka One
 4. Check Scores tab: "Load Existing Student", "Student Details", "Add Score" headers are visibly larger
 5. Confirm Report and analysis card headers are unaffected
+
+---
+
+---
+
+## Follow-on: Report Tab Redesign
+
+**Status:** Ready  
+**Prototype:** `prototype_report.html` (side-by-side before/after, approved by Gautam)
+
+### Context
+
+The Report tab currently returns a Markdown string from `get_progress_report()` rendered by `gr.Markdown`. This limits styling to what Markdown can express — plain tables, bold text, horizontal rules. Switching to `gr.HTML` + structured HTML output unlocks full CSS control.
+
+### What changes visually
+
+| Element | Before | After |
+|---|---|---|
+| Title | `## Math Progress Report for Name` plain heading | Gradient banner card with subject emoji, name, RIT badge |
+| Metrics | Plain 2-col Markdown table | 4 stat cards (Trend / Sessions / Accuracy / Growth), colour-coded |
+| Concepts Mastered | Comma-separated bold text | Green card with ✓ pill badges |
+| Needs More Work | Comma-separated bold text | Yellow card with pill badges |
+| Session History | Plain Markdown table | Styled table with colour-coded accuracy badges (green/yellow/red) |
+| Narrative | Plain text below a `### Narrative Report` heading | Indigo left-border card |
+| Generate button | Plain Gradio default button | Indigo gradient, Fredoka One font |
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `frontend/app.py` | `get_progress_report()` returns HTML string instead of Markdown; `gr.Markdown` → `gr.HTML` in `_build_report_tab()`; new CSS classes added to `theme.custom_css` |
+
+### Implementation steps
+
+#### 1. Add report CSS to `theme.custom_css`
+
+```css
+/* === Report Tab === */
+.report-header { background: linear-gradient(135deg, #4f46e5 0%, #38bdf8 100%); border-radius: 14px; padding: 1.25rem 1.5rem; color: white; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+.report-header-title { font-family: 'Fredoka One', cursive; font-size: 1.3rem; letter-spacing: 0.02em; }
+.report-header-sub { font-size: 0.85rem; font-weight: 600; opacity: 0.85; margin-top: 0.2rem; }
+.report-header-badge { background: rgba(255,255,255,0.2); border-radius: 50px; padding: 0.4rem 1rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+.report-stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+.report-stat-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 0.85rem 1rem; text-align: center; }
+.report-stat-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+.report-stat-value { font-family: 'Fredoka One', cursive; font-size: 1.5rem; color: #1e293b; line-height: 1; }
+.report-stat-value.green { color: #059669; } .report-stat-value.orange { color: #d97706; } .report-stat-value.indigo { color: #4f46e5; } .report-stat-value.red { color: #dc2626; }
+.report-stat-sub { font-size: 0.72rem; font-weight: 700; color: #94a3b8; margin-top: 0.2rem; }
+.report-section { border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 1rem; border: 1.5px solid #e2e8f0; }
+.report-section.mastered { background: #f0fdf4; border-color: #86efac; }
+.report-section.needs-work { background: #fffbeb; border-color: #fde68a; }
+.report-section-title { font-family: 'Fredoka One', cursive; font-size: 1.05rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.report-section.mastered .report-section-title { color: #065f46; }
+.report-section.needs-work .report-section-title { color: #92400e; }
+.report-pill-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.report-pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.85rem; border-radius: 50px; font-size: 0.85rem; font-weight: 700; }
+.report-pill.green { background: #dcfce7; color: #166534; }
+.report-pill.orange { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+.report-session-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.report-session-table th { background: linear-gradient(135deg, #e0e7ff, #dbeafe); color: #3730a3; font-weight: 800; padding: 0.6rem 0.85rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.report-session-table td { padding: 0.6rem 0.85rem; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #374151; }
+.report-session-table tr:last-child td { border-bottom: none; }
+.report-accuracy { display: inline-flex; align-items: center; padding: 0.2rem 0.65rem; border-radius: 50px; font-size: 0.82rem; font-weight: 800; }
+.report-accuracy.high { background: #dcfce7; color: #166534; }
+.report-accuracy.mid  { background: #fef9c3; color: #854d0e; }
+.report-accuracy.low  { background: #fee2e2; color: #991b1b; }
+.report-narrative { background: #f8fafc; border: 1.5px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 0 14px 14px 0; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 0.95rem; line-height: 1.75; color: #374151; }
+.report-narrative-title { font-family: 'Fredoka One', cursive; font-size: 1.05rem; color: #4f46e5; margin-bottom: 0.75rem; }
+```
+
+#### 2. Switch `_build_report_tab()` from `gr.Markdown` to `gr.HTML`
+
+```python
+# OLD
+report_output = gr.Markdown(label="Report")
+
+# NEW
+report_output = gr.HTML(label="Report")
+```
+
+#### 3. Rewrite `get_progress_report()` to return HTML
+
+Replace the `dashboard` Markdown f-string with an HTML equivalent using the new CSS classes. Structure:
+
+```
+<div class="report-header"> ... </div>
+<div class="report-stat-cards"> 4× <div class="report-stat-card"> </div>
+<div class="report-section mastered"> concept pills </div>
+<div class="report-section needs-work"> concept pills </div>
+<div class="report-section"> <table class="report-session-table"> ... </table> </div>
+<div class="report-narrative"> LLM text </div>
+```
+
+Accuracy badge class logic:
+```python
+def _accuracy_class(pct: float) -> str:
+    if pct >= 80: return "high"
+    if pct >= 40: return "mid"
+    return "low"
+```
+
+Trend colour logic:
+```python
+trend_color = {"growing": "green", "stalling": "orange", "declining": "red"}.get(trend_str, "indigo")
+trend_icon  = {"growing": "↑", "stalling": "→", "declining": "↓"}.get(trend_str, "—")
+```
+
+Growth delta colour:
+```python
+growth_color = "green" if growth_delta > 0 else "red" if growth_delta < 0 else "indigo"
+```
+
+> **Note:** All LLM-generated text (narrative report) must be HTML-escaped with `html.escape()` before insertion.
+
+### Verification
+
+1. `just app` — launch Gradio
+2. Load a student with completed sessions, go to 📋 Report tab
+3. Click Generate Report — verify:
+   - Gradient header with subject emoji, student name, RIT badge
+   - 4 stat cards render correctly with colour-coded values
+   - Mastered concepts show as green pills; needs-work as yellow pills
+   - Session history table has colour-coded accuracy badges
+   - Narrative section renders below with indigo left border
+4. Verify Scores and Practice tabs are unaffected
+5. `just test` — all existing tests pass
 
 ---
 

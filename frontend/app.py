@@ -5,6 +5,10 @@ import logging
 import re
 import traceback
 
+from markdown_it import MarkdownIt
+
+_md = MarkdownIt()
+
 import gradio as gr
 
 logging.basicConfig(
@@ -2040,14 +2044,17 @@ def _show_results(pstate: dict):
 
 def get_progress_report(student_id, subject="math", progress=gr.Progress()):
     """Generate a progress report for the student."""
+    def _info(msg: str) -> str:
+        return f"<p style='color:#6b7280;font-weight:600;padding:1rem 0;'>{msg}</p>"
+
     if not student_id:
-        return "Register a student first."
+        return _info("Register a student first.")
 
     db = SessionLocal()
     try:
         student = db.query(Student).filter(Student.id == int(student_id)).first()
         if not student:
-            return "Student not found."
+            return _info("Student not found.")
 
         scores = (
             db.query(Score)
@@ -2055,7 +2062,7 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
             .all()
         )
         if not scores:
-            return f"No {SUBJECT_DISPLAY.get(subject, subject)} scores found."
+            return _info(f"No {SUBJECT_DISPLAY.get(subject, subject)} scores found.")
 
         latest = max(scores, key=lambda s: (s.year, SEASON_ORDER[s.season]))
 
@@ -2081,7 +2088,10 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         )
 
         if not sessions:
-            return "No completed practice sessions yet. Complete a practice session first to get a report."
+            return _info(
+                "No completed practice sessions yet. "
+                "Complete a practice session first to get a report."
+            )
 
         # Aggregate mastery
         concept_totals = {}
@@ -2103,14 +2113,32 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
             if d["total"] > 0 and d["correct"] / d["total"] < 0.8
         ]
 
-        from src.models.schemas import StudentProgress
+        from src.models.schemas import SessionSummary, StudentProgress
+
+        # Sort sessions chronologically before building summaries
+        sessions = sorted(
+            sessions, key=lambda s: s.completed_at or s.started_at
+        )
 
         student_progress = StudentProgress(
             student_name=student.name,
             grade=student.grade,
             latest_rit=latest.rit_score,
             trend=trend,
-            sessions=[],
+            sessions=[
+                SessionSummary(
+                    session_id=s.id,
+                    student_name=student.name,
+                    band=s.band,
+                    total_questions=s.total_questions,
+                    correct=s.correct,
+                    score_pct=s.score_pct,
+                    concept_scores=s.concept_scores or {},
+                    timestamp=s.completed_at or s.started_at,
+                    subject=s.subject,
+                )
+                for s in sessions
+            ],
             mastered_concepts=mastered,
             needs_work_concepts=needs_work,
             subject=subject,
@@ -2119,7 +2147,151 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         progress(0.5, desc="Gemma 4 E4B generating report...")
         report = generate_report(student_progress)
         subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
-        return f"## {subject_display} Progress Report for {student.name}\n\n{report}"
+
+        # Build structured data dashboard above the narrative
+        total_correct = sum(s.correct for s in sessions)
+        total_qs = sum(s.total_questions for s in sessions)
+        overall_pct = (
+            round(total_correct / total_qs * 100) if total_qs > 0 else 0
+        )
+        first_pct = sessions[0].score_pct if sessions else 0
+        last_pct = sessions[-1].score_pct if sessions else 0
+        growth_delta = last_pct - first_pct
+        growth_arrow = "+" if growth_delta > 0 else ""
+        trend_label = trend.value.title() if trend else "N/A"
+
+        # Colour / icon helpers
+        subject_emoji = {"math": "🔢", "reading": "📚", "science": "🔬"}.get(
+            subject, "📋"
+        )
+        trend_lower = trend_label.lower()
+        trend_color = {
+            "growing": "green",
+            "stalling": "orange",
+            "declining": "red",
+        }.get(trend_lower, "indigo")
+        trend_icon = {
+            "growing": "↑",
+            "stalling": "→",
+            "declining": "↓",
+        }.get(trend_lower, "—")
+        growth_color = (
+            "green" if growth_delta > 0 else "red" if growth_delta < 0 else "indigo"
+        )
+
+        def _acc_class(pct: float) -> str:
+            if pct >= 80:
+                return "high"
+            if pct >= 40:
+                return "mid"
+            return "low"
+
+        # ── Header ────────────────────────────────────────────────────────────
+        dashboard = (
+            f'<div class="report-header">'
+            f'  <div>'
+            f'    <div class="report-header-title">'
+            f"      {subject_emoji} {html.escape(subject_display)} Progress Report"
+            f"    </div>"
+            f'    <div class="report-header-sub">'
+            f"      {html.escape(student.name)}"
+            f"    </div>"
+            f"  </div>"
+            f'  <div class="report-header-badge">RIT {latest.rit_score}</div>'
+            f"</div>"
+        )
+
+        # ── Stat cards ────────────────────────────────────────────────────────
+        dashboard += (
+            f'<div class="report-stat-cards">'
+            f'  <div class="report-stat-card">'
+            f'    <div class="report-stat-label">Trend</div>'
+            f'    <div class="report-stat-value {trend_color}">{trend_icon}</div>'
+            f'    <div class="report-stat-sub">{html.escape(trend_label)}</div>'
+            f"  </div>"
+            f'  <div class="report-stat-card">'
+            f'    <div class="report-stat-label">Sessions</div>'
+            f'    <div class="report-stat-value indigo">{len(sessions)}</div>'
+            f'    <div class="report-stat-sub">completed</div>'
+            f"  </div>"
+            f'  <div class="report-stat-card">'
+            f'    <div class="report-stat-label">Accuracy</div>'
+            f'    <div class="report-stat-value orange">{overall_pct}%</div>'
+            f'    <div class="report-stat-sub">{total_correct} / {total_qs} correct</div>'
+            f"  </div>"
+            f'  <div class="report-stat-card">'
+            f'    <div class="report-stat-label">Growth</div>'
+            f'    <div class="report-stat-value {growth_color}">'
+            f"      {growth_arrow}{growth_delta:.0f}%"
+            f"    </div>"
+            f'    <div class="report-stat-sub">'
+            f"      {first_pct:.0f}% → {last_pct:.0f}%"
+            f"    </div>"
+            f"  </div>"
+            f"</div>"
+        )
+
+        # ── Concepts mastered ─────────────────────────────────────────────────
+        mastered_pills = "".join(
+            f'<span class="report-pill green">✓ {html.escape(c)}</span>'
+            for c in mastered
+        ) or '<span style="color:#94a3b8;font-style:italic;">None yet</span>'
+        dashboard += (
+            f'<div class="report-section mastered">'
+            f'  <div class="report-section-title">✅ Concepts Mastered</div>'
+            f'  <div class="report-pill-row">{mastered_pills}</div>'
+            f"</div>"
+        )
+
+        # ── Needs more work ───────────────────────────────────────────────────
+        needs_pills = "".join(
+            f'<span class="report-pill orange">{html.escape(c)}</span>'
+            for c in needs_work
+        ) or '<span style="color:#94a3b8;font-style:italic;">None yet</span>'
+        dashboard += (
+            f'<div class="report-section needs-work">'
+            f'  <div class="report-section-title">🔧 Needs More Work</div>'
+            f'  <div class="report-pill-row">{needs_pills}</div>'
+            f"</div>"
+        )
+
+        # ── Session history ───────────────────────────────────────────────────
+        rows = ""
+        for i, s in enumerate(sessions, start=1):
+            pct_val = s.score_pct if s.score_pct is not None else 0
+            acc_cls = _acc_class(pct_val)
+            rows += (
+                f"<tr>"
+                f"  <td>{i}</td>"
+                f"  <td>{html.escape(s.band or '')}</td>"
+                f"  <td>{s.correct}/{s.total_questions}</td>"
+                f'  <td><span class="report-accuracy {acc_cls}">'
+                f"    {pct_val:.0f}%"
+                f"  </span></td>"
+                f"</tr>"
+            )
+        dashboard += (
+            f'<div class="report-section" style="background:white;">'
+            f'  <div class="report-section-title" style="color:#1e293b;">📅 Session History</div>'
+            f'  <table class="report-session-table">'
+            f"    <thead>"
+            f"      <tr><th>#</th><th>Band</th><th>Score</th><th>Accuracy</th></tr>"
+            f"    </thead>"
+            f"    <tbody>{rows}</tbody>"
+            f"  </table>"
+            f"</div>"
+        )
+
+        # ── Narrative ─────────────────────────────────────────────────────────
+        narrative_html = _md.render(report)
+        dashboard += (
+            f'<div class="report-narrative">'
+            f'  <div class="report-narrative-title">📝 Narrative Report</div>'
+            f"  {narrative_html}"
+            f"</div>"
+        )
+
+        return dashboard
     finally:
         db.close()
 
@@ -2303,6 +2475,43 @@ button.primary:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px
 /* === Tab & Section Header Font Sizes === */
 .tab-container > button { font-family: 'Fredoka One', cursive !important; font-size: 1.1rem !important; letter-spacing: 0.02em !important; }
 .prose h3 { font-size: 1.2rem !important; font-weight: 900 !important; }
+
+/* === Report Tab === */
+.report-header { background: linear-gradient(135deg, #4f46e5 0%, #38bdf8 100%); border-radius: 14px; padding: 1.25rem 1.5rem; color: white; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+.report-header-title { font-family: 'Fredoka One', cursive; font-size: 1.3rem; letter-spacing: 0.02em; color: white !important; }
+.report-header-sub { font-size: 0.85rem; font-weight: 600; opacity: 0.85; margin-top: 0.2rem; color: white !important; }
+.report-header-badge { background: rgba(255,255,255,0.2); border-radius: 50px; padding: 0.4rem 1rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+.report-stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+.report-stat-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 0.85rem 1rem; text-align: center; }
+.report-stat-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+.report-stat-value { font-family: 'Fredoka One', cursive; font-size: 1.5rem; color: #1e293b; line-height: 1; }
+.report-stat-value.green { color: #059669; } .report-stat-value.orange { color: #d97706; } .report-stat-value.indigo { color: #4f46e5; } .report-stat-value.red { color: #dc2626; }
+.report-stat-sub { font-size: 0.72rem; font-weight: 700; color: #94a3b8; margin-top: 0.2rem; }
+.report-section { border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 1rem; border: 1.5px solid #e2e8f0; }
+.report-section.mastered { background: #f0fdf4; border-color: #86efac; }
+.report-section.needs-work { background: #fffbeb; border-color: #fde68a; }
+.report-section-title { font-family: 'Fredoka One', cursive; font-size: 1.05rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.report-section.mastered .report-section-title { color: #065f46; }
+.report-section.needs-work .report-section-title { color: #92400e; }
+.report-pill-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.report-pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.85rem; border-radius: 50px; font-size: 0.85rem; font-weight: 700; }
+.report-pill.green { background: #dcfce7; color: #166534; }
+.report-pill.orange { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+.report-session-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.report-session-table th { background: linear-gradient(135deg, #e0e7ff, #dbeafe); color: #3730a3; font-weight: 800; padding: 0.6rem 0.85rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.report-session-table th:first-child { border-radius: 8px 0 0 8px; } .report-session-table th:last-child { border-radius: 0 8px 8px 0; }
+.report-session-table td { padding: 0.6rem 0.85rem; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #374151; }
+.report-session-table tr:last-child td { border-bottom: none; }
+.report-accuracy { display: inline-flex; align-items: center; padding: 0.2rem 0.65rem; border-radius: 50px; font-size: 0.82rem; font-weight: 800; }
+.report-accuracy.high { background: #dcfce7; color: #166534; }
+.report-accuracy.mid  { background: #fef9c3; color: #854d0e; }
+.report-accuracy.low  { background: #fee2e2; color: #991b1b; }
+.report-narrative { background: #f8fafc; border: 1.5px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 0 14px 14px 0; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 0.95rem; line-height: 1.75; color: #374151; }
+.report-narrative-title { font-family: 'Fredoka One', cursive; font-size: 1.05rem; color: #4f46e5; margin-bottom: 0.75rem; }
+.report-narrative p { margin: 0 0 0.6rem 0; }
+.report-narrative ul, .report-narrative ol { margin: 0.25rem 0 0.6rem 1.25rem; padding: 0; }
+.report-narrative li { margin-bottom: 0.3rem; }
+.report-narrative strong { color: #1e293b; font-weight: 800; }
 """
 
 custom_css = theme.custom_css
@@ -2668,12 +2877,23 @@ def _build_practice_tab(subject: str, student_id_state):
 def _build_report_tab(subject: str, student_id_state):
     """Build the Report sub-tab for a given subject."""
     report_btn = gr.Button("Generate Report", variant="primary")
-    report_output = gr.Markdown(label="Report")
+    report_output = gr.HTML(label="Report")
+
+    def _show_loading():
+        return gr.update(
+            value="<p style='color:#6b7280;font-weight:600;padding:1rem 0;'>"
+            "⏳ Generating report… Please wait while Gemma 4 "
+            "analyzes practice session data.</p>",
+        )
 
     def _report(sid):
         return get_progress_report(sid, subject=subject)
 
     report_btn.click(
+        fn=_show_loading,
+        inputs=[],
+        outputs=[report_output],
+    ).then(
         fn=_report,
         inputs=[student_id_state],
         outputs=[report_output],

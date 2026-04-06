@@ -402,8 +402,34 @@ def generate_exercises(
     )
 
 
+def _format_session_details(
+    sessions: list,
+) -> list[str]:
+    """Build one-line summaries for each practice session.
+
+    :param sessions: list of SessionSummary objects (chronologically sorted).
+    :return: list of formatted strings, one per session.
+    """
+    details: list[str] = []
+    for i, s in enumerate(sessions, start=1):
+        concept_parts = []
+        for concept, data in (s.concept_scores or {}).items():
+            correct = data.get("correct", 0)
+            total = data.get("total", 0)
+            concept_parts.append(f"{concept} {correct}/{total}")
+        concepts_str = ", ".join(concept_parts) if concept_parts else "N/A"
+        details.append(
+            f"Session {i} (Band {s.band}): "
+            f"{s.correct}/{s.total_questions} ({s.score_pct:.0f}%) "
+            f"— {concepts_str}"
+        )
+    return details
+
+
 def generate_report(progress: StudentProgress) -> str:
     """Generate a teacher/parent report using Gemma 4."""
+
+    session_details = _format_session_details(progress.sessions)
 
     prompt = build_report_prompt(
         student_name=progress.student_name,
@@ -414,6 +440,7 @@ def generate_report(progress: StudentProgress) -> str:
         mastered_concepts=progress.mastered_concepts,
         needs_work_concepts=progress.needs_work_concepts,
         subject=progress.subject,
+        session_details=session_details,
     )
 
     response = ollama.chat(

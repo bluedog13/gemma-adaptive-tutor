@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Tab Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background: #f0f9ff; color: #1e293b; padding: 1.5rem; }
+
+  h1 { font-family: 'Fredoka One', cursive; font-size: 1.8rem; color: #4f46e5; text-align: center; margin-bottom: 0.25rem; }
+  .subtitle { text-align: center; color: #94a3b8; font-size: 0.95rem; font-weight: 600; margin-bottom: 2rem; }
+
+  /* ===== COMPARISON GRID ===== */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1400px; margin: 0 auto; }
+  .col { display: flex; flex-direction: column; align-items: center; }
+  .col-label {
+    font-family: 'Fredoka One', cursive; font-size: 1.3rem;
+    text-align: center; padding: 0.4rem 1.5rem; border-radius: 50px;
+    display: inline-block; margin-bottom: 1rem;
+  }
+  .col-before .col-label { background: #e2e8f0; color: #475569; }
+  .col-after  .col-label { background: linear-gradient(135deg, #818cf8, #38bdf8); color: white; }
+
+  .panel { width: 100%; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; padding: 1.5rem; }
+
+  /* ===== BEFORE: plain markdown-style ===== */
+  .before-h2 { font-size: 1.25rem; font-weight: 800; color: #1e1b4b; margin-bottom: 1rem; }
+  .before-h3 { font-size: 1rem; font-weight: 800; color: #1e1b4b; margin: 1.25rem 0 0.5rem; }
+  .before-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 1rem; }
+  .before-table th, .before-table td { border: 1px solid #e5e7eb; padding: 0.5rem 0.75rem; text-align: left; }
+  .before-table th { background: #f9fafb; font-weight: 700; }
+  .before-divider { border: none; border-top: 1px solid #e5e7eb; margin: 1rem 0; }
+  .before-text { font-size: 0.9rem; color: #374151; line-height: 1.7; }
+
+  /* ===== AFTER: styled HTML ===== */
+
+  /* Report header */
+  .report-header {
+    background: linear-gradient(135deg, #4f46e5 0%, #38bdf8 100%);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    color: white;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .report-header-title { font-family: 'Fredoka One', cursive; font-size: 1.3rem; letter-spacing: 0.02em; }
+  .report-header-sub { font-size: 0.85rem; font-weight: 600; opacity: 0.85; margin-top: 0.2rem; }
+  .report-header-badge {
+    background: rgba(255,255,255,0.2);
+    border-radius: 50px;
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* Stat cards */
+  .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+  .stat-card {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+    text-align: center;
+  }
+  .stat-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+  .stat-value { font-family: 'Fredoka One', cursive; font-size: 1.5rem; color: #1e293b; line-height: 1; }
+  .stat-value.green { color: #059669; }
+  .stat-value.orange { color: #d97706; }
+  .stat-value.indigo { color: #4f46e5; }
+  .stat-sub { font-size: 0.72rem; font-weight: 700; color: #94a3b8; margin-top: 0.2rem; }
+
+  /* Section cards */
+  .section-card {
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    border: 1.5px solid #e2e8f0;
+  }
+  .section-title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.05rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section-card.mastered { background: #f0fdf4; border-color: #86efac; }
+  .section-card.mastered .section-title { color: #065f46; }
+  .section-card.needs-work { background: #fffbeb; border-color: #fde68a; }
+  .section-card.needs-work .section-title { color: #92400e; }
+
+  /* Concept pills */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .pill.green { background: #dcfce7; color: #166534; }
+  .pill.orange { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+  .pill.empty { color: #94a3b8; font-style: italic; font-size: 0.85rem; }
+
+  /* Session history table */
+  .session-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .session-table th {
+    background: linear-gradient(135deg, #e0e7ff, #dbeafe);
+    color: #3730a3;
+    font-weight: 800;
+    padding: 0.6rem 0.85rem;
+    text-align: left;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .session-table th:first-child { border-radius: 8px 0 0 8px; }
+  .session-table th:last-child { border-radius: 0 8px 8px 0; }
+  .session-table td { padding: 0.6rem 0.85rem; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #374151; }
+  .session-table tr:last-child td { border-bottom: none; }
+  .session-table tr:hover td { background: #f8fafc; }
+
+  .accuracy-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    border-radius: 50px;
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+  .accuracy-badge.high { background: #dcfce7; color: #166534; }
+  .accuracy-badge.mid  { background: #fef9c3; color: #854d0e; }
+  .accuracy-badge.low  { background: #fee2e2; color: #991b1b; }
+
+  /* Narrative card */
+  .narrative-card {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-left: 4px solid #4f46e5;
+    border-radius: 0 14px 14px 0;
+    padding: 1rem 1.25rem;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: #374151;
+  }
+  .narrative-card .narrative-title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.05rem;
+    color: #4f46e5;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Generate button */
+  .gen-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #4f46e5, #818cf8);
+    color: white;
+    border: none;
+    padding: 0.85rem;
+    border-radius: 14px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.05rem;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+    margin-bottom: 1.25rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Report Tab Prototype</h1>
+<p class="subtitle">Current markdown output (left) vs. proposed styled HTML (right)</p>
+
+<div class="grid">
+
+  <!-- ===== BEFORE ===== -->
+  <div class="col col-before">
+    <div class="col-label">Before</div>
+    <div class="panel">
+      <button style="width:100%;background:#4f46e5;color:white;border:none;padding:0.6rem;border-radius:8px;font-size:0.9rem;font-weight:700;margin-bottom:1rem;cursor:pointer;">Generate Report</button>
+      <h2 class="before-h2">Math Progress Report for Tamanna G.</h2>
+      <hr class="before-divider">
+      <table class="before-table">
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td><strong>RIT Score</strong></td><td>196</td></tr>
+        <tr><td><strong>Trend</strong></td><td>Stalling</td></tr>
+        <tr><td><strong>Sessions Completed</strong></td><td>6</td></tr>
+        <tr><td><strong>Overall Accuracy</strong></td><td>13/30 (43%)</td></tr>
+        <tr><td><strong>Growth (First → Last)</strong></td><td>0% → 40% (+40%)</td></tr>
+      </table>
+      <hr class="before-divider">
+      <h3 class="before-h3">Concepts Mastered</h3>
+      <p class="before-text"><strong>unit cube</strong></p>
+      <h3 class="before-h3">Needs More Work</h3>
+      <p class="before-text"><strong>hundredths</strong>, <strong>rate</strong>, <strong>tenths</strong>, <strong>thousandths</strong></p>
+      <hr class="before-divider">
+      <h3 class="before-h3">Session History</h3>
+      <table class="before-table">
+        <tr><th>Session</th><th>Band</th><th>Score</th><th>Accuracy</th></tr>
+        <tr><td>1</td><td>201-210</td><td>0/1</td><td>0%</td></tr>
+        <tr><td>2</td><td>201-210</td><td>3/3</td><td>100%</td></tr>
+        <tr><td>3</td><td>201-210</td><td>1/1</td><td>100%</td></tr>
+        <tr><td>4</td><td>201-210</td><td>2/5</td><td>40%</td></tr>
+        <tr><td>5</td><td>201-210</td><td>1/5</td><td>20%</td></tr>
+        <tr><td>6</td><td>201-210</td><td>6/15</td><td>40%</td></tr>
+      </table>
+      <hr class="before-divider">
+      <h3 class="before-h3">Narrative Report</h3>
+      <p class="before-text">Tamanna is showing early signs of progress in the 201-210 RIT band, though consistency remains a challenge. Sessions 2 and 3 showed perfect scores, but accuracy dropped significantly in later sessions...</p>
+    </div>
+  </div>
+
+  <!-- ===== AFTER ===== -->
+  <div class="col col-after">
+    <div class="col-label">✨ After</div>
+    <div class="panel">
+
+      <button class="gen-btn">📋 Generate Report</button>
+
+      <!-- Header -->
+      <div class="report-header">
+        <div>
+          <div class="report-header-title">🔢 Math Progress Report</div>
+          <div class="report-header-sub">Tamanna G. &mdash; Grade 2</div>
+        </div>
+        <div class="report-header-badge">RIT 196</div>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-label">Trend</div>
+          <div class="stat-value orange">→</div>
+          <div class="stat-sub">Stalling</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sessions</div>
+          <div class="stat-value indigo">6</div>
+          <div class="stat-sub">completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Accuracy</div>
+          <div class="stat-value orange">43%</div>
+          <div class="stat-sub">13 / 30 correct</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Growth</div>
+          <div class="stat-value green">+40%</div>
+          <div class="stat-sub">0% → 40%</div>
+        </div>
+      </div>
+
+      <!-- Concepts -->
+      <div class="section-card mastered">
+        <div class="section-title">✅ Concepts Mastered</div>
+        <div class="pill-row">
+          <span class="pill green">✓ unit cube</span>
+        </div>
+      </div>
+
+      <div class="section-card needs-work">
+        <div class="section-title">🔧 Needs More Work</div>
+        <div class="pill-row">
+          <span class="pill orange">hundredths</span>
+          <span class="pill orange">rate</span>
+          <span class="pill orange">tenths</span>
+          <span class="pill orange">thousandths</span>
+        </div>
+      </div>
+
+      <!-- Session history -->
+      <div class="section-card" style="background:white;">
+        <div class="section-title" style="color:#1e293b;">📅 Session History</div>
+        <table class="session-table">
+          <thead>
+            <tr><th>#</th><th>Band</th><th>Score</th><th>Accuracy</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>201-210</td><td>0/1</td><td><span class="accuracy-badge low">0%</span></td></tr>
+            <tr><td>2</td><td>201-210</td><td>3/3</td><td><span class="accuracy-badge high">100%</span></td></tr>
+            <tr><td>3</td><td>201-210</td><td>1/1</td><td><span class="accuracy-badge high">100%</span></td></tr>
+            <tr><td>4</td><td>201-210</td><td>2/5</td><td><span class="accuracy-badge mid">40%</span></td></tr>
+            <tr><td>5</td><td>201-210</td><td>1/5</td><td><span class="accuracy-badge low">20%</span></td></tr>
+            <tr><td>6</td><td>201-210</td><td>6/15</td><td><span class="accuracy-badge mid">40%</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Narrative -->
+      <div class="narrative-card">
+        <div class="narrative-title">📝 Narrative Report</div>
+        Tamanna is showing early signs of progress in the 201-210 RIT band, though consistency remains a challenge. Sessions 2 and 3 showed perfect scores, but accuracy dropped significantly in later sessions — suggesting the concepts introduced later (hundredths, rate, tenths, thousandths) need more targeted practice before mastery.
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
