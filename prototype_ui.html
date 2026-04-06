@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAP Accelerator — Kid-Friendly UI Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ===== RESET ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ===== ROOT PALETTE ===== */
+  :root {
+    --sky:     #38bdf8;
+    --sky-lt:  #e0f7ff;
+    --indigo:  #818cf8;
+    --indigo-dk: #4f46e5;
+    --green:   #34d399;
+    --green-dk:#059669;
+    --yellow:  #fbbf24;
+    --orange:  #fb923c;
+    --pink:    #f472b6;
+    --purple:  #a78bfa;
+    --bg:      #f0f9ff;
+    --white:   #ffffff;
+    --gray-lt: #f1f5f9;
+    --gray:    #94a3b8;
+    --text:    #1e293b;
+    --radius:  20px;
+    --shadow:  0 4px 20px rgba(0,0,0,0.10);
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 1.5rem;
+  }
+
+  /* ===== COMPARISON LABEL ===== */
+  .compare-label {
+    text-align: center;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    color: var(--gray);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+  }
+
+  /* ===== LAYOUT: side-by-side ===== */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+  .compare-col { display: flex; flex-direction: column; gap: 0; }
+  .compare-col h2 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.4rem;
+    text-align: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem 1.5rem;
+    border-radius: 50px;
+    display: inline-block;
+    align-self: center;
+  }
+  .col-before h2 { background: #e2e8f0; color: #475569; }
+  .col-after  h2 { background: linear-gradient(135deg, #818cf8, #38bdf8); color: white; }
+
+  /* ===== BEFORE: mimic current design ===== */
+  .before-wrap {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .before-header {
+    background: #1b6d7c;
+    color: white;
+    padding: 0.6rem 1rem;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .before-body { padding: 1.25rem; }
+  .before-counter { font-size: 12px; color: #666; text-align: right; margin-bottom: 0.5rem; }
+  .before-passage {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 0.75rem;
+    line-height: 1.6;
+  }
+  .before-passage-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #666; margin-bottom: 0.4rem; }
+  .before-question { font-size: 14px; color: #333; margin-bottom: 0.75rem; line-height: 1.6; }
+  .before-rule { border: none; border-top: 2px solid #3b8bc5; margin: 0.75rem 0; }
+  .before-answer-label { font-size: 12px; font-weight: 700; color: #666; margin-bottom: 0.5rem; }
+  .before-choices { display: flex; flex-direction: column; gap: 0; margin-bottom: 1rem; }
+  .before-choice {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 14px; color: #333; cursor: pointer;
+  }
+  .before-choice input { accent-color: #3b8bc5; width: 16px; height: 16px; }
+  .before-btns { display: flex; gap: 0.75rem; margin-top: 1rem; }
+  .before-submit {
+    background: #1b6d7c; color: white;
+    border: none; padding: 0.55rem 1.5rem;
+    font-size: 14px; font-weight: 600; border-radius: 3px;
+    cursor: pointer; flex: 1;
+  }
+  .before-next {
+    background: white; color: #1b6d7c;
+    border: 1px solid #1b6d7c; padding: 0.55rem 1.5rem;
+    font-size: 14px; font-weight: 600; border-radius: 3px;
+    cursor: pointer; flex: 1;
+  }
+  .before-slider-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+  .before-slider-label { font-size: 13px; color: #555; flex: 1; }
+  .before-slider { flex: 2; }
+  .before-tabs { display: flex; gap: 1px; margin-bottom: 1rem; border-bottom: 2px solid #e5e7eb; }
+  .before-tab {
+    padding: 0.5rem 1rem; font-size: 13px; font-weight: 600;
+    color: #6b7280; cursor: pointer; border: none; background: none;
+  }
+  .before-tab.active { color: #1b6d7c; border-bottom: 2px solid #1b6d7c; margin-bottom: -2px; }
+
+  /* ===== AFTER: new playful design ===== */
+  .after-wrap {
+    background: var(--white);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 2px solid var(--sky-lt);
+  }
+
+  /* ---- Top bar with stars / subject ---- */
+  .after-topbar {
+    background: linear-gradient(135deg, #4f46e5 0%, #38bdf8 100%);
+    padding: 0.85rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: white;
+  }
+  .after-topbar .subject-badge {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    letter-spacing: 0.03em;
+  }
+  .after-topbar .subject-badge .emoji { font-size: 1.4rem; }
+  .after-topbar .streak {
+    background: rgba(255,255,255,0.2);
+    border-radius: 50px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  /* ---- Progress bar ---- */
+  .after-progress-area {
+    background: var(--sky-lt);
+    padding: 0.6rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .after-progress-bar-wrap {
+    flex: 1;
+    background: rgba(255,255,255,0.8);
+    border-radius: 50px;
+    height: 12px;
+    overflow: hidden;
+    border: 2px solid var(--sky);
+  }
+  .after-progress-fill {
+    height: 100%;
+    width: 20%;
+    background: linear-gradient(90deg, var(--indigo), var(--sky));
+    border-radius: 50px;
+    transition: width 0.5s ease;
+  }
+  .after-progress-label {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--indigo-dk);
+    white-space: nowrap;
+  }
+
+  /* ---- Question body ---- */
+  .after-body { padding: 1.25rem 1.4rem; }
+
+  .after-topic-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: linear-gradient(135deg, #e0e7ff, #dbeafe);
+    color: #3730a3;
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 0.35rem 0.9rem;
+    border-radius: 50px;
+    margin-bottom: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .after-passage-card {
+    background: linear-gradient(135deg, #fffbeb, #fef9c3);
+    border: 2px solid #fde68a;
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.9rem;
+    position: relative;
+  }
+  .after-passage-card::before {
+    content: "📖 Read This First";
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    color: #92400e;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .after-passage-text {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #44403c;
+  }
+
+  .after-question {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  /* ---- Answer choices ---- */
+  .after-choices { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 1.1rem; }
+  .after-choice {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    border: 2.5px solid #e2e8f0;
+    background: var(--gray-lt);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .after-choice:hover {
+    border-color: var(--indigo);
+    background: #eef2ff;
+    transform: translateX(3px);
+  }
+  .after-choice.selected {
+    border-color: var(--indigo-dk);
+    background: #e0e7ff;
+    color: var(--indigo-dk);
+  }
+  .after-choice .choice-letter {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #cbd5e1;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fredoka One', cursive;
+    font-size: 0.9rem;
+    color: var(--gray);
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .after-choice.selected .choice-letter {
+    background: var(--indigo-dk);
+    border-color: var(--indigo-dk);
+    color: white;
+  }
+
+  /* ---- Buttons ---- */
+  .after-btns { display: flex; gap: 0.75rem; }
+  .after-submit {
+    flex: 2;
+    background: linear-gradient(135deg, #4f46e5, #818cf8);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 14px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.05rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.35);
+    transition: all 0.15s ease;
+  }
+  .after-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(79,70,229,0.45); }
+  .after-next {
+    flex: 1;
+    background: white;
+    color: #4f46e5;
+    border: 2.5px solid #818cf8;
+    padding: 0.8rem 1.2rem;
+    border-radius: 14px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.05rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .after-next:hover { background: #eef2ff; transform: translateY(-2px); }
+
+  /* ---- Tabs ---- */
+  .after-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0.75rem 1rem 0;
+    background: white;
+    border-bottom: 2px solid var(--sky-lt);
+  }
+  .after-tab {
+    padding: 0.55rem 1.1rem;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1rem;
+    color: var(--gray);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-radius: 10px 10px 0 0;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .after-tab.active {
+    background: linear-gradient(135deg, #e0e7ff, #dbeafe);
+    color: var(--indigo-dk);
+    font-weight: 900;
+  }
+  .after-tab .tab-icon { margin-right: 0.3rem; }
+
+  /* ---- Slider area ---- */
+  .after-slider-row {
+    background: var(--gray-lt);
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .after-slider-label {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--indigo-dk);
+    white-space: nowrap;
+  }
+  .after-slider-label .emoji { margin-right: 0.3rem; }
+  input[type=range].kid-slider {
+    flex: 1;
+    accent-color: var(--indigo-dk);
+    height: 6px;
+    cursor: pointer;
+  }
+  .after-slider-value {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.2rem;
+    color: var(--indigo-dk);
+    min-width: 2rem;
+    text-align: center;
+  }
+  .after-start-btn {
+    background: linear-gradient(135deg, #34d399, #059669);
+    color: white;
+    border: none;
+    padding: 0.7rem 1.4rem;
+    border-radius: 14px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(52,211,153,0.4);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .after-start-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(52,211,153,0.5); }
+
+  /* ---- Feedback states ---- */
+  .after-feedback-correct {
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border: 2px solid #34d399;
+    border-radius: 14px;
+    padding: 0.9rem 1.1rem;
+    margin-top: 0.75rem;
+  }
+  .after-feedback-correct h3 { color: #065f46; font-size: 1rem; margin-bottom: 0.3rem; }
+  .after-feedback-correct p { color: #374151; font-size: 0.9rem; line-height: 1.6; }
+
+  /* ===== SECTION TITLE ===== */
+  .section-title {
+    text-align: center;
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    color: var(--indigo-dk);
+    margin-bottom: 0.25rem;
+    letter-spacing: 0.02em;
+  }
+  .section-sub {
+    text-align: center;
+    font-size: 0.95rem;
+    color: var(--gray);
+    margin-bottom: 2rem;
+    font-weight: 600;
+  }
+
+  /* ===== COLOR SWATCH SECTION ===== */
+  .swatches {
+    max-width: 1300px;
+    margin: 2.5rem auto 0;
+  }
+  .swatches h3 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.2rem;
+    color: var(--indigo-dk);
+    margin-bottom: 0.75rem;
+  }
+  .swatch-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .swatch {
+    width: 70px; height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+
+<h1 class="section-title">🎨 UI Prototype — Playful & Colorful</h1>
+<p class="section-sub">Current design (left) vs. proposed kid-friendly redesign (right)</p>
+
+<div class="compare-grid">
+
+  <!-- ===== BEFORE ===== -->
+  <div class="compare-col col-before">
+    <h2>Before</h2>
+    <div class="before-wrap">
+      <!-- Tabs -->
+      <div style="padding: 0.75rem 1rem 0; background: white;">
+        <div class="before-tabs">
+          <button class="before-tab">Scores</button>
+          <button class="before-tab active">Practice</button>
+          <button class="before-tab">Report</button>
+        </div>
+      </div>
+
+      <div class="before-body">
+        <!-- Slider -->
+        <div class="before-slider-row">
+          <span class="before-slider-label">Number of Questions (default: 5)</span>
+          <input type="range" min="3" max="24" value="5" class="before-slider">
+          <span style="font-size:16px; font-weight:700; width:2rem;">5</span>
+        </div>
+        <button style="width:100%; background:#1b6d7c; color:white; border:none; padding:0.6rem; font-size:14px; font-weight:600; border-radius:3px; margin-bottom:1.25rem; cursor:pointer;">Start Practice</button>
+
+        <!-- Counter -->
+        <div class="before-counter">Question 1 of 5</div>
+
+        <!-- Banner -->
+        <div class="before-header">Climate change science</div>
+
+        <!-- Passage -->
+        <div class="before-passage">
+          <div class="before-passage-label">READ THE PASSAGE</div>
+          Imagine Earth was covered in a giant, thick blanket made of invisible gases (called greenhouse gases). These gases trap some of the sun's warmth, which is natural and good. But when humans burn too much fuel, we make this blanket too thick, trapping too much heat.
+        </div>
+
+        <!-- Question -->
+        <div class="before-question">
+          If all the rainforests suddenly disappeared and the planet absorbed more sunlight, what would be the biggest change?
+        </div>
+        <hr class="before-rule">
+        <div class="before-answer-label">Select your answer</div>
+
+        <!-- Choices -->
+        <div class="before-choices">
+          <label class="before-choice"><input type="radio" name="q1"> A. The rivers would flow much faster.</label>
+          <label class="before-choice"><input type="radio" name="q1"> B. The average temperature of the planet would drop very low.</label>
+          <label class="before-choice"><input type="radio" name="q1"> C. The planet would get warmer, causing big changes in weather.</label>
+          <label class="before-choice"><input type="radio" name="q1"> D. Animals would suddenly learn to fly.</label>
+        </div>
+
+        <!-- Buttons -->
+        <div class="before-btns">
+          <button class="before-submit">Submit Answer</button>
+          <button class="before-next">Next Question</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AFTER ===== -->
+  <div class="compare-col col-after">
+    <h2>✨ After</h2>
+    <div class="after-wrap">
+
+      <!-- Top bar -->
+      <div class="after-topbar">
+        <div class="subject-badge">
+          <span class="emoji">🔬</span> Science
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="after-tabs">
+        <button class="after-tab"><span class="tab-icon">📊</span>Scores</button>
+        <button class="after-tab active"><span class="tab-icon">🎯</span>Practice</button>
+        <button class="after-tab"><span class="tab-icon">📋</span>Report</button>
+      </div>
+
+      <div class="after-body">
+        <!-- Slider + Start -->
+        <div class="after-slider-row">
+          <span class="after-slider-label"><span class="emoji">❓</span>Questions</span>
+          <input type="range" min="3" max="24" value="5" class="kid-slider">
+          <span class="after-slider-value">5</span>
+          <button class="after-start-btn">▶ Start!</button>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="after-progress-area" style="border-radius: 12px; margin-bottom: 1rem;">
+          <div class="after-progress-bar-wrap">
+            <div class="after-progress-fill"></div>
+          </div>
+          <span class="after-progress-label">1 of 5</span>
+        </div>
+
+        <!-- Topic chip -->
+        <div class="after-topic-chip">🌍 Climate change science</div>
+
+        <!-- Passage -->
+        <div class="after-passage-card">
+          <p class="after-passage-text">
+            Imagine Earth was covered in a giant, thick blanket made of invisible gases (called greenhouse gases). These gases trap some of the sun's warmth, which is natural and good. But when humans burn too much fuel, we make this blanket too thick, trapping too much heat.
+          </p>
+        </div>
+
+        <!-- Question -->
+        <p class="after-question">
+          If all the rainforests suddenly disappeared and the planet absorbed more sunlight, what would be the biggest change?
+        </p>
+
+        <!-- Choices -->
+        <div class="after-choices">
+          <label class="after-choice">
+            <span class="choice-letter">A</span>
+            The rivers would flow much faster.
+          </label>
+          <label class="after-choice">
+            <span class="choice-letter">B</span>
+            The average temperature of the planet would drop very low.
+          </label>
+          <label class="after-choice selected">
+            <span class="choice-letter">C</span>
+            The planet would get warmer, causing big changes in weather.
+          </label>
+          <label class="after-choice">
+            <span class="choice-letter">D</span>
+            Animals would suddenly learn to fly.
+          </label>
+        </div>
+
+        <!-- Buttons -->
+        <div class="after-btns">
+          <button class="after-submit">✅ Submit Answer</button>
+          <button class="after-next">Next →</button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== COLOUR PALETTE ===== -->
+<div class="swatches">
+  <h3>🎨 Proposed Palette</h3>
+  <div class="swatch-row">
+    <div class="swatch" style="background:#4f46e5;">Indigo</div>
+    <div class="swatch" style="background:#818cf8;">Indigo Lt</div>
+    <div class="swatch" style="background:#38bdf8;">Sky</div>
+    <div class="swatch" style="background:#34d399;">Green</div>
+    <div class="swatch" style="background:#fbbf24; color:#78350f; text-shadow:none;">Yellow</div>
+    <div class="swatch" style="background:#fb923c;">Orange</div>
+    <div class="swatch" style="background:#f472b6;">Pink</div>
+    <div class="swatch" style="background:#a78bfa;">Purple</div>
+    <div class="swatch" style="background:#f0f9ff; color:#94a3b8; text-shadow:none; border:1px solid #e2e8f0;">BG</div>
+  </div>
+</div>
+
+<script>
+  // Make choices interactive in the prototype
+  document.querySelectorAll('.after-choice').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.after-choice').forEach(x => x.classList.remove('selected'));
+      c.classList.add('selected');
+    });
+  });
+
+  // Sync slider value
+  const kidSlider = document.querySelector('.kid-slider');
+  const kidVal = document.querySelector('.after-slider-value');
+  if (kidSlider) kidSlider.addEventListener('input', () => kidVal.textContent = kidSlider.value);
+</script>
+</body>
+</html>
