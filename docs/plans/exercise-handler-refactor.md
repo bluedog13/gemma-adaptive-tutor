@@ -1,6 +1,6 @@
 # Plan: Refactor Exercise Display & Grading into Per-Type Handlers
 
-**Status:** Planned  
+**Status:** Done  
 **Files:** `frontend/app.py`
 
 ---

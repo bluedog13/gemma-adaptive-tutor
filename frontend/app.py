@@ -1034,7 +1034,11 @@ def _format_choices(ex: dict, subject: str) -> list[str]:
 
 
 def _build_question_html(
-    idx: int, ex: dict, total: int, pstate: dict | None = None, part_label: str | None = None
+    idx: int,
+    ex: dict,
+    total: int,
+    pstate: dict | None = None,
+    part_label: str | None = None,
 ) -> str:
     """Build the common question HTML (topbar, progress bar, topic chip, question).
 
@@ -1054,6 +1058,7 @@ def _build_question_html(
         "science": "🔬",
     }.get(subject.lower(), "📖")
     from src.models.schemas import SUBJECT_DISPLAY as _SD
+
     subject_display = _SD.get(subject, subject.title())
 
     # Progress bar width as percentage
@@ -1062,13 +1067,13 @@ def _build_question_html(
     topbar = (
         f'<div class="map-topbar">'
         f'<span class="map-topbar-subject">{subject_emoji} {subject_display}</span>'
-        f'</div>'
+        f"</div>"
         f'<div class="map-progress-area">'
         f'<div class="map-progress-bar-wrap">'
         f'<div class="map-progress-fill" style="width:{progress_pct}%"></div>'
-        f'</div>'
+        f"</div>"
         f'<span class="map-progress-label">{idx + 1} of {total}</span>'
-        f'</div>'
+        f"</div>"
     )
 
     scenario_html = ""
@@ -1104,8 +1109,184 @@ def _hidden_all_inputs():
     )
 
 
+def _format_mc(idx: int, ex: dict, total: int, pstate: dict) -> tuple:
+    """Format a multiple-choice exercise.
+
+    :param idx: Current exercise index.
+    :param ex: Exercise dict.
+    :param total: Total number of exercises.
+    :param pstate: Practice state dict.
+    :return: 6-tuple for display.
+    """
+    subject = pstate.get("subject", "math")
+    if not ex.get("choices"):
+        return _format_fill_blank(idx, ex, total, pstate)
+    question_html = _build_question_html(idx, ex, total, pstate=pstate)
+    choices = _format_choices(ex, subject)
+    return (
+        question_html,
+        gr.update(visible=False, value=""),
+        gr.update(choices=choices, value=None, visible=True, interactive=True),
+        gr.update(visible=False, value=None, choices=[]),
+        "",
+        gr.update(interactive=True),
+    )
+
+
+def _format_multi_select(idx: int, ex: dict, total: int, pstate: dict) -> tuple:
+    """Format a multi-select exercise.
+
+    :param idx: Current exercise index.
+    :param ex: Exercise dict.
+    :param total: Total number of exercises.
+    :param pstate: Practice state dict.
+    :return: 6-tuple for display.
+    """
+    subject = pstate.get("subject", "math")
+    if not ex.get("choices"):
+        return _format_fill_blank(idx, ex, total, pstate)
+    num_correct = ex.get("num_correct", 2)
+    question_html = _build_question_html(idx, ex, total, pstate=pstate)
+    question_html += f'<p class="map-instruction">Choose {num_correct} answers.</p>'
+    choices = _format_choices(ex, subject)
+    return (
+        question_html,
+        gr.update(visible=False, value=""),
+        gr.update(visible=False, value=None, choices=[]),
+        gr.update(choices=choices, value=None, visible=True, interactive=True),
+        "",
+        gr.update(interactive=True),
+    )
+
+
+def _format_two_part(idx: int, ex: dict, total: int, pstate: dict) -> tuple:
+    """Format a two-part exercise (Part A).
+
+    :param idx: Current exercise index.
+    :param ex: Exercise dict.
+    :param total: Total number of exercises.
+    :param pstate: Practice state dict.
+    :return: 6-tuple for display.
+    """
+    subject = pstate.get("subject", "math")
+    if not ex.get("choices"):
+        return _format_fill_blank(idx, ex, total, pstate)
+    question_html = _build_question_html(
+        idx, ex, total, pstate=pstate, part_label="Part A"
+    )
+    choices = _format_choices(ex, subject)
+    return (
+        question_html,
+        gr.update(visible=False, value=""),
+        gr.update(choices=choices, value=None, visible=True, interactive=True),
+        gr.update(visible=False, value=None, choices=[]),
+        "",
+        gr.update(interactive=True),
+    )
+
+
+def _format_sequence(idx: int, ex: dict, total: int, pstate: dict) -> tuple:
+    """Format a sequence-ordering exercise.
+
+    :param idx: Current exercise index.
+    :param ex: Exercise dict.
+    :param total: Total number of exercises.
+    :param pstate: Practice state dict.
+    :return: 6-tuple for display.
+    """
+    if not ex.get("items_to_order"):
+        return _format_fill_blank(idx, ex, total, pstate)
+    question_html = _build_question_html(idx, ex, total, pstate=pstate)
+    items_list = "".join(
+        f"<li>{html.escape(item)}</li>" for item in ex["items_to_order"]
+    )
+    question_html += (
+        f'<p class="map-instruction">'
+        f"Put these in the correct order. Type the numbers "
+        f"separated by commas (e.g., 2, 4, 1, 3).</p>"
+        f"<ol>{items_list}</ol>"
+    )
+    return (
+        question_html,
+        gr.update(visible=True, value=""),
+        gr.update(visible=False, value=None, choices=[]),
+        gr.update(visible=False, value=None, choices=[]),
+        "",
+        gr.update(interactive=True),
+    )
+
+
+def _format_table(idx: int, ex: dict, total: int, pstate: dict) -> tuple:
+    """Format a table-matching exercise.
+
+    :param idx: Current exercise index.
+    :param ex: Exercise dict.
+    :param total: Total number of exercises.
+    :param pstate: Practice state dict.
+    :return: 6-tuple for display.
+    """
+    if not ex.get("match_pairs"):
+        return _format_fill_blank(idx, ex, total, pstate)
+    question_html = _build_question_html(idx, ex, total, pstate=pstate)
+    options = ex.get("match_options", [])
+    options_str = ", ".join(html.escape(o) for o in options)
+    rows_html = ""
+    for item in ex["match_pairs"]:
+        rows_html += f"<tr><td>{html.escape(item)}</td><td>___</td></tr>"
+    question_html += (
+        f'<p class="map-instruction">'
+        f"For each item, choose: {options_str}</p>"
+        f'<table class="map-match-table">'
+        f"<tr><th>Item</th><th>Category</th></tr>"
+        f"{rows_html}</table>"
+        f'<p class="map-instruction">'
+        f"Type your answers separated by commas, in order "
+        f"(e.g., {options_str}).</p>"
+    )
+    return (
+        question_html,
+        gr.update(visible=True, value=""),
+        gr.update(visible=False, value=None, choices=[]),
+        gr.update(visible=False, value=None, choices=[]),
+        "",
+        gr.update(interactive=True),
+    )
+
+
+def _format_fill_blank(idx: int, ex: dict, total: int, pstate: dict) -> tuple:
+    """Format a fill-in-the-blank exercise (also used as fallback).
+
+    :param idx: Current exercise index.
+    :param ex: Exercise dict.
+    :param total: Total number of exercises.
+    :param pstate: Practice state dict.
+    :return: 6-tuple for display.
+    """
+    question_html = _build_question_html(idx, ex, total, pstate=pstate)
+    return (
+        question_html,
+        gr.update(visible=True, value=""),
+        gr.update(visible=False, value=None, choices=[]),
+        gr.update(visible=False, value=None, choices=[]),
+        "",
+        gr.update(interactive=True),
+    )
+
+
+_FORMATTERS: dict[str, callable] = {
+    "multiple_choice": _format_mc,
+    "multi_select": _format_multi_select,
+    "two_part": _format_two_part,
+    "sequence_order": _format_sequence,
+    "table_matching": _format_table,
+    "fill_in_the_blank": _format_fill_blank,
+}
+
+
 def _format_exercise(idx: int, pstate: dict):
     """Format the current exercise as MAP-styled HTML.
+
+    Dispatches to the appropriate per-type formatter.
 
     :return: 6-tuple of (question_html, textbox_update, radio_update,
              checkbox_update, feedback_clear, submit_btn_update).
@@ -1116,113 +1297,13 @@ def _format_exercise(idx: int, pstate: dict):
         return _show_results(pstate)
 
     ex = exercises[idx]
-    total = len(exercises)
-    subject = pstate.get("subject", "math")
     q_type = ex.get("question_type", "multiple_choice")
 
     # Reset two-part state for new exercise
     pstate["current_part"] = "a"
 
-    # --- Two-part: Part A ---
-    if q_type == "two_part" and ex.get("choices"):
-        question_html = _build_question_html(idx, ex, total, pstate=pstate, part_label="Part A")
-        choices = _format_choices(ex, subject)
-        return (
-            question_html,
-            gr.update(visible=False, value=""),
-            gr.update(choices=choices, value=None, visible=True, interactive=True),
-            gr.update(visible=False, value=None, choices=[]),
-            "",
-            gr.update(interactive=True),
-        )
-
-    # --- Multi-select ---
-    if q_type == "multi_select" and ex.get("choices"):
-        num_correct = ex.get("num_correct", 2)
-        question_html = _build_question_html(idx, ex, total, pstate=pstate)
-        # Add instruction to the question
-        question_html += f'<p class="map-instruction">Choose {num_correct} answers.</p>'
-        choices = _format_choices(ex, subject)
-        return (
-            question_html,
-            gr.update(visible=False, value=""),
-            gr.update(visible=False, value=None, choices=[]),
-            gr.update(choices=choices, value=None, visible=True, interactive=True),
-            "",
-            gr.update(interactive=True),
-        )
-
-    # --- Sequence ordering ---
-    if q_type == "sequence_order" and ex.get("items_to_order"):
-        question_html = _build_question_html(idx, ex, total, pstate=pstate)
-        items_list = "".join(
-            f"<li>{html.escape(item)}</li>" for item in ex["items_to_order"]
-        )
-        question_html += (
-            f'<p class="map-instruction">'
-            f"Put these in the correct order. Type the numbers "
-            f"separated by commas (e.g., 2, 4, 1, 3).</p>"
-            f"<ol>{items_list}</ol>"
-        )
-        return (
-            question_html,
-            gr.update(visible=True, value=""),
-            gr.update(visible=False, value=None, choices=[]),
-            gr.update(visible=False, value=None, choices=[]),
-            "",
-            gr.update(interactive=True),
-        )
-
-    # --- Table matching ---
-    if q_type == "table_matching" and ex.get("match_pairs"):
-        question_html = _build_question_html(idx, ex, total, pstate=pstate)
-        options = ex.get("match_options", [])
-        options_str = ", ".join(html.escape(o) for o in options)
-        rows_html = ""
-        for item in ex["match_pairs"]:
-            rows_html += f"<tr><td>{html.escape(item)}</td><td>___</td></tr>"
-        question_html += (
-            f'<p class="map-instruction">'
-            f"For each item, choose: {options_str}</p>"
-            f'<table class="map-match-table">'
-            f"<tr><th>Item</th><th>Category</th></tr>"
-            f"{rows_html}</table>"
-            f'<p class="map-instruction">'
-            f"Type your answers separated by commas, in order "
-            f"(e.g., {options_str}).</p>"
-        )
-        return (
-            question_html,
-            gr.update(visible=True, value=""),
-            gr.update(visible=False, value=None, choices=[]),
-            gr.update(visible=False, value=None, choices=[]),
-            "",
-            gr.update(interactive=True),
-        )
-
-    # --- Standard multiple choice ---
-    if q_type == "multiple_choice" and ex.get("choices"):
-        question_html = _build_question_html(idx, ex, total, pstate=pstate)
-        choices = _format_choices(ex, subject)
-        return (
-            question_html,
-            gr.update(visible=False, value=""),
-            gr.update(choices=choices, value=None, visible=True, interactive=True),
-            gr.update(visible=False, value=None, choices=[]),
-            "",
-            gr.update(interactive=True),
-        )
-
-    # --- Fill-in-the-blank / fallback ---
-    question_html = _build_question_html(idx, ex, total, pstate=pstate)
-    return (
-        question_html,
-        gr.update(visible=True, value=""),
-        gr.update(visible=False, value=None, choices=[]),
-        gr.update(visible=False, value=None, choices=[]),
-        "",
-        gr.update(interactive=True),
-    )
+    formatter = _FORMATTERS.get(q_type, _format_mc)
+    return formatter(idx, ex, len(exercises), pstate)
 
 
 def _grade_mc_answer(raw_answer: str, ex: dict, correct_ans: str) -> bool:
@@ -1318,35 +1399,51 @@ def _resolve_answer_to_choice(answer: str, choices: list[str]) -> str:
     return _normalize_answer_text(ans)
 
 
-def submit_answer(
+def _session_complete_banner() -> str:
+    """Return the session-complete HTML banner."""
+    return (
+        '<div class="map-session-complete">'
+        "Session complete — click Next Question to see results."
+        "</div>"
+    )
+
+
+def _advance_and_maybe_complete(
+    pstate: dict, exercises: list[dict], idx: int, feedback: str
+) -> str:
+    """Advance exercise_idx and append completion banner if done.
+
+    :param pstate: Practice state dict (mutated).
+    :param exercises: Full exercises list.
+    :param idx: Current exercise index.
+    :param feedback: Current feedback HTML.
+    :return: Updated feedback HTML.
+    """
+    pstate["exercise_idx"] = idx + 1
+    if pstate["exercise_idx"] >= len(exercises):
+        feedback += _session_complete_banner()
+    return feedback
+
+
+def _grade_two_part_submit(
     text_answer: str,
     radio_answer: str | None,
     checkbox_answer: list[str] | None,
     pstate: dict,
-):
-    """Check the answer and show MAP-styled feedback.
+    ex: dict,
+    idx: int,
+    exercises: list[dict],
+) -> tuple:
+    """Grade a two-part question (handles Part A → Part B transition).
 
-    :param text_answer: Free-response text from the textbox.
-    :param radio_answer: Selected radio label (e.g. ``"A.  3/4"``), or None.
-    :param checkbox_answer: Selected checkbox labels, or None.
-    :param pstate: Per-client practice state dict.
-    :return: 7-tuple of (question, answer_input, answer_radio,
-             answer_checkbox, feedback, submit_btn, updated_pstate).
+    :return: 7-tuple of (question, textbox, radio, checkbox, feedback,
+             submit_btn, pstate).
     """
-    exercises = pstate["exercises"]
-    idx = pstate["exercise_idx"]
-    if idx >= len(exercises):
-        result = _show_results(pstate)
-        return (*result, pstate)
-
-    ex = exercises[idx]
-    q_type = ex.get("question_type", "multiple_choice")
     subject = pstate.get("subject", "math")
     current_part = pstate.get("current_part", "a")
 
-    # --- Two-part: Part A submitted, show Part B ---
-    if q_type == "two_part" and current_part == "a":
-        # Grade Part A
+    # --- Part A submitted, show Part B ---
+    if current_part == "a":
         correct_a = ex["correct_answer"].strip().lower()
         if radio_answer:
             part_a_correct = _grade_mc_answer(radio_answer, ex, correct_a)
@@ -1359,7 +1456,6 @@ def submit_answer(
         pstate["part_a_correct"] = part_a_correct
         pstate["current_part"] = "b"
 
-        # Build Part A feedback
         explanation_a = html.escape(ex.get("explanation", ""))
         if part_a_correct:
             part_a_fb = (
@@ -1376,26 +1472,12 @@ def submit_answer(
                 f"<p>{explanation_a}</p></div>"
             )
 
-        # Show Part B
         if ex.get("part_b_question") and ex.get("part_b_choices"):
             part_b_ex = {
                 **ex,
                 "question": ex["part_b_question"],
                 "choices": ex["part_b_choices"],
             }
-            question_html = _build_question_html(
-                idx, ex, len(exercises), pstate=pstate, part_label="Part B"
-            )
-            # Override question text with Part B question
-            q_text = html.escape(ex["part_b_question"]).replace("\n", "<br>")
-            scenario_html = ""
-            if ex.get("scenario"):
-                s_text = html.escape(ex["scenario"]).replace("\n", "<br>")
-                scenario_html = (
-                    f'<div class="map-scenario-box">'
-                    f'<div class="map-scenario-label">📖 Read This First</div>'
-                    f"{s_text}</div>"
-                )
             question_html = _build_question_html(
                 idx, ex, len(exercises), pstate=pstate, part_label="Part B"
             )
@@ -1417,8 +1499,8 @@ def submit_answer(
         # Fallback: no Part B choices — skip to grading
         pstate["current_part"] = "a"
 
-    # --- Two-part: Part B submitted ---
-    if q_type == "two_part" and current_part == "b":
+    # --- Part B submitted ---
+    if pstate.get("current_part") == "b" or current_part == "b":
         correct_b = (ex.get("part_b_correct") or "").strip().lower()
         if radio_answer:
             part_b_ex = {**ex, "choices": ex.get("part_b_choices") or []}
@@ -1436,7 +1518,6 @@ def submit_answer(
         )
         pstate["current_part"] = "a"
 
-        # Record and save
         _record_result(pstate, ex, student_ans, correct_display, is_correct)
 
         explanation = html.escape(ex.get("explanation", ""))
@@ -1457,13 +1538,7 @@ def submit_answer(
                 f'<p style="margin-top:0.5rem;">{explanation}</p></div>'
             )
 
-        pstate["exercise_idx"] = idx + 1
-        if pstate["exercise_idx"] >= len(exercises):
-            feedback += (
-                '<div class="map-session-complete">'
-                "Session complete — click Next Question to see results."
-                "</div>"
-            )
+        feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
         return (
             gr.update(),
             gr.update(),
@@ -1474,164 +1549,201 @@ def submit_answer(
             pstate,
         )
 
-    # --- Multi-select ---
-    if q_type == "multi_select" and checkbox_answer is not None:
-        selected_texts = {
-            _extract_choice_text(c).lower() for c in (checkbox_answer or [])
-        }
-        # Normalize correct_answers: resolve bare letters/numbers ("A", "1")
-        # to actual choice text, and strip dotted prefixes ("A. foo")
-        correct_set = set()
-        choices_list = ex.get("choices") or []
-        for c in ex.get("correct_answers") or []:
-            resolved = _resolve_answer_to_choice(c, choices_list)
-            correct_set.add(resolved.lower())
-        is_correct = selected_texts == correct_set
-        student_ans = ", ".join(checkbox_answer or [])
-        correct_display = ", ".join(ex.get("correct_answers") or [])
+    # Should not reach here; fall through to MC grading
+    return _grade_mc_submit(
+        text_answer,
+        radio_answer,
+        checkbox_answer,
+        pstate,
+        ex,
+        idx,
+        exercises,
+    )
 
-        _record_result(pstate, ex, student_ans, correct_display, is_correct)
 
-        explanation = html.escape(ex.get("explanation", ""))
-        if is_correct:
-            feedback = (
-                '<div class="map-feedback-correct">'
-                "<h3>Correct</h3>"
-                f"<p>{explanation}</p></div>"
-            )
-        else:
-            feedback = (
-                '<div class="map-feedback-incorrect">'
-                "<h3>Not quite</h3>"
-                f"<p><b>Your selections:</b> "
-                f"{html.escape(student_ans)}<br>"
-                f"<b>Correct answers:</b> "
-                f"{html.escape(correct_display)}</p>"
-                f'<p style="margin-top:0.5rem;">{explanation}</p></div>'
-            )
+def _grade_multi_select_submit(
+    text_answer: str,
+    radio_answer: str | None,
+    checkbox_answer: list[str] | None,
+    pstate: dict,
+    ex: dict,
+    idx: int,
+    exercises: list[dict],
+) -> tuple:
+    """Grade a multi-select question.
 
-        pstate["exercise_idx"] = idx + 1
-        if pstate["exercise_idx"] >= len(exercises):
-            feedback += (
-                '<div class="map-session-complete">'
-                "Session complete — click Next Question to see results."
-                "</div>"
-            )
-        return (
-            gr.update(),
-            gr.update(),
-            gr.update(),
-            gr.update(),
-            feedback,
-            gr.update(interactive=True),
-            pstate,
+    :return: 7-tuple.
+    """
+    selected_texts = {_extract_choice_text(c).lower() for c in (checkbox_answer or [])}
+    correct_set = set()
+    choices_list = ex.get("choices") or []
+    for c in ex.get("correct_answers") or []:
+        resolved = _resolve_answer_to_choice(c, choices_list)
+        correct_set.add(resolved.lower())
+    is_correct = selected_texts == correct_set
+    student_ans = ", ".join(checkbox_answer or [])
+    correct_display = ", ".join(ex.get("correct_answers") or [])
+
+    _record_result(pstate, ex, student_ans, correct_display, is_correct)
+
+    explanation = html.escape(ex.get("explanation", ""))
+    if is_correct:
+        feedback = (
+            '<div class="map-feedback-correct">'
+            "<h3>Correct</h3>"
+            f"<p>{explanation}</p></div>"
+        )
+    else:
+        feedback = (
+            '<div class="map-feedback-incorrect">'
+            "<h3>Not quite</h3>"
+            f"<p><b>Your selections:</b> "
+            f"{html.escape(student_ans)}<br>"
+            f"<b>Correct answers:</b> "
+            f"{html.escape(correct_display)}</p>"
+            f'<p style="margin-top:0.5rem;">{explanation}</p></div>'
         )
 
-    # --- Sequence ordering ---
-    if q_type == "sequence_order":
-        student_ans = (text_answer or "").strip()
-        correct_order = ex.get("correct_order") or []
+    feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
+    return (
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        feedback,
+        gr.update(interactive=True),
+        pstate,
+    )
 
-        # Student types numbers like "2, 4, 1, 3" or text items
-        student_items = [s.strip() for s in student_ans.split(",")]
-        # Try numeric interpretation: map numbers to items_to_order
-        items = ex.get("items_to_order") or []
-        reordered = []
-        try:
-            for num_str in student_items:
-                idx_num = int(num_str) - 1
-                if 0 <= idx_num < len(items):
-                    reordered.append(items[idx_num])
-        except (ValueError, IndexError):
-            reordered = student_items
 
-        is_correct = [s.strip().lower() for s in reordered] == [
-            s.strip().lower() for s in correct_order
-        ]
-        correct_display = ", ".join(correct_order)
+def _grade_sequence_submit(
+    text_answer: str,
+    radio_answer: str | None,
+    checkbox_answer: list[str] | None,
+    pstate: dict,
+    ex: dict,
+    idx: int,
+    exercises: list[dict],
+) -> tuple:
+    """Grade a sequence-ordering question.
 
-        _record_result(pstate, ex, student_ans, correct_display, is_correct)
+    :return: 7-tuple.
+    """
+    student_ans = (text_answer or "").strip()
+    correct_order = ex.get("correct_order") or []
 
-        explanation = html.escape(ex.get("explanation", ""))
-        if is_correct:
-            feedback = (
-                '<div class="map-feedback-correct">'
-                "<h3>Correct order!</h3>"
-                f"<p>{explanation}</p></div>"
-            )
-        else:
-            feedback = (
-                '<div class="map-feedback-incorrect">'
-                "<h3>Not quite</h3>"
-                f"<p><b>Correct order:</b> "
-                f"{html.escape(correct_display)}</p>"
-                f'<p style="margin-top:0.5rem;">{explanation}</p></div>'
-            )
+    student_items = [s.strip() for s in student_ans.split(",")]
+    items = ex.get("items_to_order") or []
+    reordered = []
+    try:
+        for num_str in student_items:
+            idx_num = int(num_str) - 1
+            if 0 <= idx_num < len(items):
+                reordered.append(items[idx_num])
+    except (ValueError, IndexError):
+        reordered = student_items
 
-        pstate["exercise_idx"] = idx + 1
-        if pstate["exercise_idx"] >= len(exercises):
-            feedback += (
-                '<div class="map-session-complete">'
-                "Session complete — click Next Question to see results."
-                "</div>"
-            )
-        return (
-            gr.update(),
-            gr.update(),
-            gr.update(),
-            gr.update(),
-            feedback,
-            gr.update(interactive=True),
-            pstate,
+    is_correct = [s.strip().lower() for s in reordered] == [
+        s.strip().lower() for s in correct_order
+    ]
+    correct_display = ", ".join(correct_order)
+
+    _record_result(pstate, ex, student_ans, correct_display, is_correct)
+
+    explanation = html.escape(ex.get("explanation", ""))
+    if is_correct:
+        feedback = (
+            '<div class="map-feedback-correct">'
+            "<h3>Correct order!</h3>"
+            f"<p>{explanation}</p></div>"
+        )
+    else:
+        feedback = (
+            '<div class="map-feedback-incorrect">'
+            "<h3>Not quite</h3>"
+            f"<p><b>Correct order:</b> "
+            f"{html.escape(correct_display)}</p>"
+            f'<p style="margin-top:0.5rem;">{explanation}</p></div>'
         )
 
-    # --- Table matching ---
-    if q_type == "table_matching":
-        student_ans = (text_answer or "").strip()
-        match_pairs = ex.get("match_pairs") or {}
-        student_items = [s.strip().lower() for s in student_ans.split(",")]
-        correct_vals = [v.strip().lower() for v in match_pairs.values()]
+    feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
+    return (
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        feedback,
+        gr.update(interactive=True),
+        pstate,
+    )
 
-        is_correct = student_items == correct_vals
-        correct_display = ", ".join(match_pairs.values())
 
-        _record_result(pstate, ex, student_ans, correct_display, is_correct)
+def _grade_table_submit(
+    text_answer: str,
+    radio_answer: str | None,
+    checkbox_answer: list[str] | None,
+    pstate: dict,
+    ex: dict,
+    idx: int,
+    exercises: list[dict],
+) -> tuple:
+    """Grade a table-matching question.
 
-        explanation = html.escape(ex.get("explanation", ""))
-        if is_correct:
-            feedback = (
-                '<div class="map-feedback-correct">'
-                "<h3>All matches correct!</h3>"
-                f"<p>{explanation}</p></div>"
-            )
-        else:
-            pairs_str = "; ".join(f"{k} → {v}" for k, v in match_pairs.items())
-            feedback = (
-                '<div class="map-feedback-incorrect">'
-                "<h3>Not quite</h3>"
-                f"<p><b>Correct matches:</b> "
-                f"{html.escape(pairs_str)}</p>"
-                f'<p style="margin-top:0.5rem;">{explanation}</p></div>'
-            )
+    :return: 7-tuple.
+    """
+    student_ans = (text_answer or "").strip()
+    match_pairs = ex.get("match_pairs") or {}
+    student_items = [s.strip().lower() for s in student_ans.split(",")]
+    correct_vals = [v.strip().lower() for v in match_pairs.values()]
 
-        pstate["exercise_idx"] = idx + 1
-        if pstate["exercise_idx"] >= len(exercises):
-            feedback += (
-                '<div class="map-session-complete">'
-                "Session complete — click Next Question to see results."
-                "</div>"
-            )
-        return (
-            gr.update(),
-            gr.update(),
-            gr.update(),
-            gr.update(),
-            feedback,
-            gr.update(interactive=True),
-            pstate,
+    is_correct = student_items == correct_vals
+    correct_display = ", ".join(match_pairs.values())
+
+    _record_result(pstate, ex, student_ans, correct_display, is_correct)
+
+    explanation = html.escape(ex.get("explanation", ""))
+    if is_correct:
+        feedback = (
+            '<div class="map-feedback-correct">'
+            "<h3>All matches correct!</h3>"
+            f"<p>{explanation}</p></div>"
+        )
+    else:
+        pairs_str = "; ".join(f"{k} \u2192 {v}" for k, v in match_pairs.items())
+        feedback = (
+            '<div class="map-feedback-incorrect">'
+            "<h3>Not quite</h3>"
+            f"<p><b>Correct matches:</b> "
+            f"{html.escape(pairs_str)}</p>"
+            f'<p style="margin-top:0.5rem;">{explanation}</p></div>'
         )
 
-    # --- Standard MC / fill-in-the-blank ---
+    feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
+    return (
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        feedback,
+        gr.update(interactive=True),
+        pstate,
+    )
+
+
+def _grade_mc_submit(
+    text_answer: str,
+    radio_answer: str | None,
+    checkbox_answer: list[str] | None,
+    pstate: dict,
+    ex: dict,
+    idx: int,
+    exercises: list[dict],
+) -> tuple:
+    """Grade a standard multiple-choice question.
+
+    :return: 7-tuple.
+    """
+    q_type = ex.get("question_type", "multiple_choice")
     is_mc = q_type == "multiple_choice" and ex.get("choices")
     if is_mc and radio_answer:
         raw_answer = radio_answer
@@ -1676,23 +1788,88 @@ def submit_answer(
             "</div>"
         )
 
-    pstate["exercise_idx"] = idx + 1
-
-    if pstate["exercise_idx"] >= len(exercises):
-        feedback += (
-            '<div class="map-session-complete">'
-            "Session complete — click Next Question to see your results."
-            "</div>"
-        )
+    feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
 
     return (
-        gr.update(),  # keep question visible
-        gr.update(),  # keep answer visible
-        gr.update(),  # keep radio visible
-        gr.update(),  # keep checkbox visible
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
         feedback,
         gr.update(interactive=True),
         pstate,
+    )
+
+
+def _grade_fill_blank_submit(
+    text_answer: str,
+    radio_answer: str | None,
+    checkbox_answer: list[str] | None,
+    pstate: dict,
+    ex: dict,
+    idx: int,
+    exercises: list[dict],
+) -> tuple:
+    """Grade a fill-in-the-blank question.
+
+    :return: 7-tuple.
+    """
+    return _grade_mc_submit(
+        text_answer,
+        radio_answer,
+        checkbox_answer,
+        pstate,
+        ex,
+        idx,
+        exercises,
+    )
+
+
+_GRADERS: dict[str, callable] = {
+    "multiple_choice": _grade_mc_submit,
+    "multi_select": _grade_multi_select_submit,
+    "two_part": _grade_two_part_submit,
+    "sequence_order": _grade_sequence_submit,
+    "table_matching": _grade_table_submit,
+    "fill_in_the_blank": _grade_fill_blank_submit,
+}
+
+
+def submit_answer(
+    text_answer: str,
+    radio_answer: str | None,
+    checkbox_answer: list[str] | None,
+    pstate: dict,
+):
+    """Check the answer and show MAP-styled feedback.
+
+    Dispatches to the appropriate per-type grader.
+
+    :param text_answer: Free-response text from the textbox.
+    :param radio_answer: Selected radio label (e.g. ``"A.  3/4"``), or None.
+    :param checkbox_answer: Selected checkbox labels, or None.
+    :param pstate: Per-client practice state dict.
+    :return: 7-tuple of (question, answer_input, answer_radio,
+             answer_checkbox, feedback, submit_btn, updated_pstate).
+    """
+    exercises = pstate["exercises"]
+    idx = pstate["exercise_idx"]
+    if idx >= len(exercises):
+        result = _show_results(pstate)
+        return (*result, pstate)
+
+    ex = exercises[idx]
+    q_type = ex.get("question_type", "multiple_choice")
+
+    grader = _GRADERS.get(q_type, _grade_mc_submit)
+    return grader(
+        text_answer,
+        radio_answer,
+        checkbox_answer,
+        pstate,
+        ex,
+        idx,
+        exercises,
     )
 
 
@@ -1842,7 +2019,7 @@ def _show_results(pstate: dict):
 
     results_html = (
         '<div class="map-results-card">'
-        '<h2>🎉 Session Complete!</h2>'
+        "<h2>🎉 Session Complete!</h2>"
         f'<div class="map-score-big">{correct}/{total}</div>'
         f'<div class="map-score-pct">{pct:.0f}% correct</div>'
         "<h3>Concept Breakdown</h3>"
@@ -2446,8 +2623,8 @@ def _build_practice_tab(subject: str, student_id_state):
 
     def _start(sid, nq, ps):
         result = start_practice(sid, nq, ps, subject=subject)
-        has_exercises = (
-            isinstance(result[-1], dict) and bool(result[-1].get("exercises"))
+        has_exercises = isinstance(result[-1], dict) and bool(
+            result[-1].get("exercises")
         )
         return (*result, gr.update(visible=has_exercises))
 
