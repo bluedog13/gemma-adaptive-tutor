@@ -222,9 +222,9 @@ def _parse_scores_regex(text: str, subject: str = "Math") -> dict:
     :return: Dict with ``student_name``, ``grade``, and ``scores``, or empty
              scores list if the subject section wasn't found.
     """
-    # Extract student name (appears as "Last, First M." on its own line)
-    name_match = re.search(r"\n([A-Z][a-z]+, [A-Z][a-z]+(?: [A-Z]\.?)?)\n", text)
-    student_name = name_match.group(1) if name_match else ""
+    # Extract student name (appears on the line before "Student ID:")
+    name_match = re.search(r"\n(.+?)\nStudent ID:", text)
+    student_name = name_match.group(1).strip() if name_match else ""
 
     # Find the subject section — text between "Math:" header and next subject header
     subject_headers = [

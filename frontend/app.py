@@ -1560,11 +1560,11 @@ def _grade_two_part_submit(
         feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
         return (
             gr.update(),
-            gr.update(),
-            gr.update(),
-            gr.update(),
+            gr.update(interactive=False),
+            gr.update(interactive=False),
+            gr.update(interactive=False),
             feedback,
-            gr.update(interactive=True),
+            gr.update(interactive=False),
             pstate,
         )
 
@@ -1626,11 +1626,11 @@ def _grade_multi_select_submit(
     feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
     return (
         gr.update(),
-        gr.update(),
-        gr.update(),
-        gr.update(),
+        gr.update(interactive=False),
+        gr.update(interactive=False),
+        gr.update(interactive=False),
         feedback,
-        gr.update(interactive=True),
+        gr.update(interactive=False),
         pstate,
     )
 
@@ -1688,11 +1688,11 @@ def _grade_sequence_submit(
     feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
     return (
         gr.update(),
-        gr.update(),
-        gr.update(),
-        gr.update(),
+        gr.update(interactive=False),
+        gr.update(interactive=False),
+        gr.update(interactive=False),
         feedback,
-        gr.update(interactive=True),
+        gr.update(interactive=False),
         pstate,
     )
 
@@ -1740,11 +1740,11 @@ def _grade_table_submit(
     feedback = _advance_and_maybe_complete(pstate, exercises, idx, feedback)
     return (
         gr.update(),
-        gr.update(),
-        gr.update(),
-        gr.update(),
+        gr.update(interactive=False),
+        gr.update(interactive=False),
+        gr.update(interactive=False),
         feedback,
-        gr.update(interactive=True),
+        gr.update(interactive=False),
         pstate,
     )
 
@@ -1815,7 +1815,7 @@ def _grade_mc_submit(
         gr.update(),
         gr.update(),
         feedback,
-        gr.update(interactive=True),
+        gr.update(interactive=False),
         pstate,
     )
 
@@ -2352,6 +2352,18 @@ theme = gr.themes.Soft(
     font=("Nunito", "Inter", "system-ui", "-apple-system", "sans-serif"),
     font_mono=("JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"),
 )
+theme.set(
+    block_label_background_fill="transparent",
+    block_label_background_fill_dark="transparent",
+    block_label_border_color="transparent",
+    block_label_border_width="0px",
+    block_label_padding="0px 0px 4px 0px",
+    block_label_radius="0px",
+    block_label_text_color="*neutral_700",
+    block_label_text_weight="700",
+    block_title_background_fill="transparent",
+    block_title_padding="0px 0px 4px 0px",
+)
 theme.custom_css = """
 .gradio-container { background-color: #f9fafb !important; font-family: 'Nunito', 'Inter', system-ui, sans-serif !important; }
 .tabitem { border-radius: 16px !important; padding: 2rem !important; border: 1px solid #e5e7eb !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important; margin-top: 1rem; }
@@ -2360,8 +2372,58 @@ theme.custom_css = """
 .pill-primary { background-color: #e0e7ff; color: #4338ca; }
 .pill-secondary { background-color: #ecfdf5; color: #047857; }
 .pill-neutral { background-color: #f3f4f6; color: #374151; }
-button.primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; border: none !important; color: white !important; transition: all 0.2s ease; }
-button.primary:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4); }
+
+/* === Global Button Styles === */
+button.primary {
+    background: linear-gradient(135deg, #4f46e5, #818cf8) !important;
+    color: white !important;
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.02em !important;
+    padding: 0.65rem 1.35rem !important;
+    border-radius: 12px !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.3) !important;
+    transition: all 0.15s ease !important;
+}
+button.primary:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 18px rgba(79,70,229,0.45) !important; }
+button.secondary {
+    background: white !important;
+    color: #4f46e5 !important;
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.02em !important;
+    padding: 0.65rem 1.35rem !important;
+    border-radius: 12px !important;
+    border: 2px solid #818cf8 !important;
+    box-shadow: 0 2px 6px rgba(79,70,229,0.1) !important;
+    transition: all 0.15s ease !important;
+}
+button.secondary:hover { background: #eef2ff !important; transform: translateY(-2px) !important; box-shadow: 0 4px 12px rgba(79,70,229,0.2) !important; }
+button.stop {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    color: white !important;
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.02em !important;
+    padding: 0.65rem 1.35rem !important;
+    border-radius: 12px !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(220,38,38,0.3) !important;
+    transition: all 0.15s ease !important;
+}
+button.stop:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 18px rgba(220,38,38,0.45) !important; }
+button.secondary.sm {
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 0.85rem !important;
+    padding: 0.4rem 0.9rem !important;
+    border-radius: 10px !important;
+    border: 2px solid #c7d2fe !important;
+    background: #eef2ff !important;
+    color: #4338ca !important;
+    box-shadow: none !important;
+}
+button.secondary.sm:hover { background: #e0e7ff !important; transform: translateY(-1px) !important; }
 .analysis-output h2 { color: #1e1b4b; border-bottom: 2px solid #e0e7ff; padding-bottom: 0.5rem; margin-top: 1.5rem; }
 .feedback-correct { background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 1rem; border-radius: 8px; }
 .feedback-incorrect { background-color: #fff7ed; border-left: 4px solid #f97316; padding: 1rem; border-radius: 8px; }
@@ -2943,13 +3005,6 @@ with gr.Blocks(
         refresh_btn = gr.Button("Refresh List", variant="secondary", scale=1)
         delete_btn = gr.Button("Delete Student", variant="stop", scale=1)
 
-    # Confirmation row — hidden by default
-    delete_target_state = gr.State(None)  # captures student key at click time
-    with gr.Row(visible=False) as confirm_row:
-        confirm_msg = gr.Markdown("")
-        confirm_delete_btn = gr.Button("Confirm Delete", variant="stop", scale=1)
-        cancel_delete_btn = gr.Button("Cancel", variant="secondary", scale=1)
-
     def refresh_student_list_btn():
         return gr.update(choices=list(get_existing_students().keys()), value=None)
 
@@ -2959,42 +3014,18 @@ with gr.Blocks(
         outputs=[student_dropdown],
     )
 
-    def show_delete_confirmation(selection: str | None):
-        """Show confirmation row and capture the selected student."""
+    def delete_student(selection: str | None):
+        """Delete the selected student after JS confirm() approval."""
         if not selection:
             gr.Warning("Please select a student first.")
-            return gr.update(visible=False), "", None
-        return (
-            gr.update(visible=True),
-            f"**Are you sure?** This will permanently delete **{selection}** "
-            "and all their scores, practice sessions, and reports.",
-            selection,
-        )
-
-    def cancel_delete():
-        """Hide confirmation row and clear captured target."""
-        return gr.update(visible=False), "", None
-
-    def confirm_delete_student(target: str | None):
-        """Delete the captured student and refresh the dropdown."""
-        if not target:
-            gr.Warning("No student selected.")
-            return (
-                gr.update(visible=False),
-                "",
-                None,
-                gr.update(choices=list(get_existing_students().keys()), value=None),
-            )
+            return gr.update()
 
         student_map = get_existing_students()
-        student_id = student_map.get(target)
+        student_id = student_map.get(selection)
         if not student_id:
             gr.Warning("Student not found.")
-            return (
-                gr.update(visible=False),
-                "",
-                None,
-                gr.update(choices=list(get_existing_students().keys()), value=None),
+            return gr.update(
+                choices=list(get_existing_students().keys()), value=None
             )
 
         db = SessionLocal()
@@ -3003,33 +3034,22 @@ with gr.Blocks(
             if student:
                 db.delete(student)
                 db.commit()
-                gr.Info(f"Deleted {target}.")
+                gr.Info(f"Deleted {selection}.")
             else:
                 gr.Warning("Student not found in database.")
         finally:
             db.close()
 
-        return (
-            gr.update(visible=False),
-            "",
-            None,
-            gr.update(choices=list(get_existing_students().keys()), value=None),
+        return gr.update(
+            choices=list(get_existing_students().keys()), value=None
         )
 
     delete_btn.click(
-        fn=show_delete_confirmation,
+        fn=delete_student,
         inputs=[student_dropdown],
-        outputs=[confirm_row, confirm_msg, delete_target_state],
-    )
-    cancel_delete_btn.click(
-        fn=cancel_delete,
-        inputs=[],
-        outputs=[confirm_row, confirm_msg, delete_target_state],
-    )
-    confirm_delete_btn.click(
-        fn=confirm_delete_student,
-        inputs=[delete_target_state],
-        outputs=[confirm_row, confirm_msg, delete_target_state, student_dropdown],
+        outputs=[student_dropdown],
+        js="(sel) => { if (!sel) return sel; if (!confirm('Are you sure? This will permanently delete ' + sel + ' and all their scores, practice sessions, and reports.')) { throw new Error('cancelled'); } return sel; }",
+        show_progress="hidden",
     )
 
     # Top-level subject tabs — each subject gets its own student_id_state
