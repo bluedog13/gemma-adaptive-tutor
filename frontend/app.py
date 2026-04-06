@@ -2,6 +2,7 @@
 
 import html
 import logging
+import logging.handlers
 import re
 import traceback
 
@@ -11,10 +12,24 @@ _md = MarkdownIt()
 
 import gradio as gr
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT)
+
+# Rolling file log: 5 MB per file, keep 3 backups (logs/map_accelerator.log)
+_log_dir = __import__("pathlib").Path(__file__).resolve().parent.parent / "logs"
+_log_dir.mkdir(exist_ok=True)
+_file_handler = logging.handlers.RotatingFileHandler(
+    _log_dir / "map_accelerator.log",
+    maxBytes=5 * 1024 * 1024,
+    backupCount=3,
+    encoding="utf-8",
 )
+_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+_file_handler.setLevel(logging.DEBUG)
+
 logger = logging.getLogger("map_accelerator")
+logger.setLevel(logging.DEBUG)
+logger.addHandler(_file_handler)
 import matplotlib
 
 matplotlib.use("Agg")
@@ -1892,9 +1907,11 @@ def _record_result(
     :param correct_display: Display string for correct answer.
     :param is_correct: Whether the answer is correct.
     """
+    tier = ex.get("difficulty_tier") or 1
+    concept_key = ex["concept"] if tier == 1 else f"{ex['concept']} (multi-step)"
     pstate["results"].append(
         {
-            "concept": ex["concept"],
+            "concept": concept_key,
             "topic": ex["topic"],
             "question": ex["question"],
             "student_answer": student_ans,
@@ -2044,6 +2061,7 @@ def _show_results(pstate: dict):
 
 def get_progress_report(student_id, subject="math", progress=gr.Progress()):
     """Generate a progress report for the student."""
+
     def _info(msg: str) -> str:
         return f"<p style='color:#6b7280;font-weight:600;padding:1rem 0;'>{msg}</p>"
 
@@ -2116,9 +2134,7 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         from src.models.schemas import SessionSummary, StudentProgress
 
         # Sort sessions chronologically before building summaries
-        sessions = sorted(
-            sessions, key=lambda s: s.completed_at or s.started_at
-        )
+        sessions = sorted(sessions, key=lambda s: s.completed_at or s.started_at)
 
         student_progress = StudentProgress(
             student_name=student.name,
@@ -2151,9 +2167,7 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         # Build structured data dashboard above the narrative
         total_correct = sum(s.correct for s in sessions)
         total_qs = sum(s.total_questions for s in sessions)
-        overall_pct = (
-            round(total_correct / total_qs * 100) if total_qs > 0 else 0
-        )
+        overall_pct = round(total_correct / total_qs * 100) if total_qs > 0 else 0
         first_pct = sessions[0].score_pct if sessions else 0
         last_pct = sessions[-1].score_pct if sessions else 0
         growth_delta = last_pct - first_pct
@@ -2189,7 +2203,7 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         # ── Header ────────────────────────────────────────────────────────────
         dashboard = (
             f'<div class="report-header">'
-            f'  <div>'
+            f"  <div>"
             f'    <div class="report-header-title">'
             f"      {subject_emoji} {html.escape(subject_display)} Progress Report"
             f"    </div>"
@@ -2232,10 +2246,13 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         )
 
         # ── Concepts mastered ─────────────────────────────────────────────────
-        mastered_pills = "".join(
-            f'<span class="report-pill green">✓ {html.escape(c)}</span>'
-            for c in mastered
-        ) or '<span style="color:#94a3b8;font-style:italic;">None yet</span>'
+        mastered_pills = (
+            "".join(
+                f'<span class="report-pill green">✓ {html.escape(c)}</span>'
+                for c in mastered
+            )
+            or '<span style="color:#94a3b8;font-style:italic;">None yet</span>'
+        )
         dashboard += (
             f'<div class="report-section mastered">'
             f'  <div class="report-section-title">✅ Concepts Mastered</div>'
@@ -2244,10 +2261,13 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         )
 
         # ── Needs more work ───────────────────────────────────────────────────
-        needs_pills = "".join(
-            f'<span class="report-pill orange">{html.escape(c)}</span>'
-            for c in needs_work
-        ) or '<span style="color:#94a3b8;font-style:italic;">None yet</span>'
+        needs_pills = (
+            "".join(
+                f'<span class="report-pill orange">{html.escape(c)}</span>'
+                for c in needs_work
+            )
+            or '<span style="color:#94a3b8;font-style:italic;">None yet</span>'
+        )
         dashboard += (
             f'<div class="report-section needs-work">'
             f'  <div class="report-section-title">🔧 Needs More Work</div>'
@@ -2483,31 +2503,31 @@ button.primary:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px
 .report-header-badge { background: rgba(255,255,255,0.2); border-radius: 50px; padding: 0.4rem 1rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
 .report-stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
 .report-stat-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 0.85rem 1rem; text-align: center; }
-.report-stat-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
-.report-stat-value { font-family: 'Fredoka One', cursive; font-size: 1.5rem; color: #1e293b; line-height: 1; }
+.report-stat-label { font-size: 0.8rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+.report-stat-value { font-family: 'Fredoka One', cursive; font-size: 1.6rem; color: #1e293b; line-height: 1; }
 .report-stat-value.green { color: #059669; } .report-stat-value.orange { color: #d97706; } .report-stat-value.indigo { color: #4f46e5; } .report-stat-value.red { color: #dc2626; }
-.report-stat-sub { font-size: 0.72rem; font-weight: 700; color: #94a3b8; margin-top: 0.2rem; }
+.report-stat-sub { font-size: 0.82rem; font-weight: 700; color: #94a3b8; margin-top: 0.2rem; }
 .report-section { border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 1rem; border: 1.5px solid #e2e8f0; }
 .report-section.mastered { background: #f0fdf4; border-color: #86efac; }
 .report-section.needs-work { background: #fffbeb; border-color: #fde68a; }
-.report-section-title { font-family: 'Fredoka One', cursive; font-size: 1.05rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.report-section-title { font-family: 'Fredoka One', cursive; font-size: 1.2rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
 .report-section.mastered .report-section-title { color: #065f46; }
 .report-section.needs-work .report-section-title { color: #92400e; }
 .report-pill-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.report-pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.85rem; border-radius: 50px; font-size: 0.85rem; font-weight: 700; }
+.report-pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 1rem; border-radius: 50px; font-size: 1rem; font-weight: 700; }
 .report-pill.green { background: #dcfce7; color: #166534; }
 .report-pill.orange { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
-.report-session-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.report-session-table { width: 100%; border-collapse: collapse; font-size: 1rem; }
 .report-session-table th { background: linear-gradient(135deg, #e0e7ff, #dbeafe); color: #3730a3; font-weight: 800; padding: 0.6rem 0.85rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .report-session-table th:first-child { border-radius: 8px 0 0 8px; } .report-session-table th:last-child { border-radius: 0 8px 8px 0; }
 .report-session-table td { padding: 0.6rem 0.85rem; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #374151; }
 .report-session-table tr:last-child td { border-bottom: none; }
-.report-accuracy { display: inline-flex; align-items: center; padding: 0.2rem 0.65rem; border-radius: 50px; font-size: 0.82rem; font-weight: 800; }
+.report-accuracy { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.95rem; font-weight: 800; }
 .report-accuracy.high { background: #dcfce7; color: #166534; }
 .report-accuracy.mid  { background: #fef9c3; color: #854d0e; }
 .report-accuracy.low  { background: #fee2e2; color: #991b1b; }
-.report-narrative { background: #f8fafc; border: 1.5px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 0 14px 14px 0; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 0.95rem; line-height: 1.75; color: #374151; }
-.report-narrative-title { font-family: 'Fredoka One', cursive; font-size: 1.05rem; color: #4f46e5; margin-bottom: 0.75rem; }
+.report-narrative { background: #f8fafc; border: 1.5px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 0 14px 14px 0; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 1.1rem; line-height: 1.8; color: #374151; }
+.report-narrative-title { font-family: 'Fredoka One', cursive; font-size: 1.25rem; color: #4f46e5; margin-bottom: 0.75rem; }
 .report-narrative p { margin: 0 0 0.6rem 0; }
 .report-narrative ul, .report-narrative ol { margin: 0.25rem 0 0.6rem 1.25rem; padding: 0; }
 .report-narrative li { margin-bottom: 0.3rem; }
@@ -2896,6 +2916,7 @@ def _build_report_tab(subject: str, student_id_state):
     ).then(
         fn=_report,
         inputs=[student_id_state],
+        show_progress="hidden",
         outputs=[report_output],
     )
 
@@ -2920,6 +2941,14 @@ with gr.Blocks(
             scale=3,
         )
         refresh_btn = gr.Button("Refresh List", variant="secondary", scale=1)
+        delete_btn = gr.Button("Delete Student", variant="stop", scale=1)
+
+    # Confirmation row — hidden by default
+    delete_target_state = gr.State(None)  # captures student key at click time
+    with gr.Row(visible=False) as confirm_row:
+        confirm_msg = gr.Markdown("")
+        confirm_delete_btn = gr.Button("Confirm Delete", variant="stop", scale=1)
+        cancel_delete_btn = gr.Button("Cancel", variant="secondary", scale=1)
 
     def refresh_student_list_btn():
         return gr.update(choices=list(get_existing_students().keys()), value=None)
@@ -2928,6 +2957,79 @@ with gr.Blocks(
         fn=refresh_student_list_btn,
         inputs=[],
         outputs=[student_dropdown],
+    )
+
+    def show_delete_confirmation(selection: str | None):
+        """Show confirmation row and capture the selected student."""
+        if not selection:
+            gr.Warning("Please select a student first.")
+            return gr.update(visible=False), "", None
+        return (
+            gr.update(visible=True),
+            f"**Are you sure?** This will permanently delete **{selection}** "
+            "and all their scores, practice sessions, and reports.",
+            selection,
+        )
+
+    def cancel_delete():
+        """Hide confirmation row and clear captured target."""
+        return gr.update(visible=False), "", None
+
+    def confirm_delete_student(target: str | None):
+        """Delete the captured student and refresh the dropdown."""
+        if not target:
+            gr.Warning("No student selected.")
+            return (
+                gr.update(visible=False),
+                "",
+                None,
+                gr.update(choices=list(get_existing_students().keys()), value=None),
+            )
+
+        student_map = get_existing_students()
+        student_id = student_map.get(target)
+        if not student_id:
+            gr.Warning("Student not found.")
+            return (
+                gr.update(visible=False),
+                "",
+                None,
+                gr.update(choices=list(get_existing_students().keys()), value=None),
+            )
+
+        db = SessionLocal()
+        try:
+            student = db.query(Student).filter(Student.id == int(student_id)).first()
+            if student:
+                db.delete(student)
+                db.commit()
+                gr.Info(f"Deleted {target}.")
+            else:
+                gr.Warning("Student not found in database.")
+        finally:
+            db.close()
+
+        return (
+            gr.update(visible=False),
+            "",
+            None,
+            gr.update(choices=list(get_existing_students().keys()), value=None),
+        )
+
+    delete_btn.click(
+        fn=show_delete_confirmation,
+        inputs=[student_dropdown],
+        outputs=[confirm_row, confirm_msg, delete_target_state],
+    )
+    cancel_delete_btn.click(
+        fn=cancel_delete,
+        inputs=[],
+        outputs=[confirm_row, confirm_msg, delete_target_state],
+    )
+    confirm_delete_btn.click(
+        fn=confirm_delete_student,
+        inputs=[delete_target_state],
+        outputs=[confirm_row, confirm_msg, delete_target_state, student_dropdown],
     )
 
     # Top-level subject tabs — each subject gets its own student_id_state

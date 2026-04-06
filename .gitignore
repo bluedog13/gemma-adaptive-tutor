@@ -31,6 +31,10 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+
+# Competition papers
+.imc/
 
 # Reports with personal details
 docs/competition/sample_report.pdf

@@ -247,6 +247,7 @@ def _parse_exercises(content: str) -> list[Exercise]:
                 ),
                 explanation=ex.get("explanation", ""),
                 scenario=ex.get("scenario"),
+                difficulty_tier=ex.get("difficulty_tier"),
                 num_correct=ex.get("num_correct"),
                 correct_answers=correct_answers,
                 part_b_question=ex.get("part_b_question"),
@@ -319,9 +320,7 @@ def generate_exercises(
             break
 
         if attempt > 0:
-            logger.info(
-                "Retry %d: requesting %d more exercises", attempt, needed
-            )
+            logger.info("Retry %d: requesting %d more exercises", attempt, needed)
             prompt = build_exercise_prompt(
                 student_name=student_name,
                 grade=grade,
@@ -381,9 +380,7 @@ def generate_exercises(
             break
 
     if not all_valid:
-        raise ValueError(
-            "All generated exercises failed validation — none were usable"
-        )
+        raise ValueError("All generated exercises failed validation — none were usable")
 
     # Trim to requested count in case we got extras
     all_valid = all_valid[:num_questions]

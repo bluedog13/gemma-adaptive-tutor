@@ -455,7 +455,7 @@ Three CSS rules appended to `theme.custom_css` in `frontend/app.py`. No Python c
 
 ## Follow-on: Report Tab Redesign
 
-**Status:** Ready  
+**Status:** Done
 **Prototype:** `prototype_report.html` (side-by-side before/after, approved by Gautam)
 
 ### Context
@@ -591,3 +591,131 @@ growth_color = "green" if growth_delta > 0 else "red" if growth_delta < 0 else "
 3. Complete a session — verify results card uses Fredoka One headings and large indigo score
 4. Switch to Scores / Report tabs — verify they are **unchanged** (Nunito/indigo)
 5. `just test` — all existing tests pass
+
+---
+
+## Post-implementation fixes
+
+### Report Tab — Narrative Markdown rendering
+**Problem:** `get_progress_report()` used `html.escape()` on the LLM narrative text, causing raw `**bold**` and `* bullet` Markdown syntax to display as literal characters inside the `gr.HTML` widget.
+**Fix:** Added `from markdown_it import MarkdownIt` (already in project venv). The narrative is now rendered via `_md.render(report)` before insertion. Added companion CSS (`.report-narrative p/ul/li/strong`) so rendered elements look tidy inside the card.
+
+### Report Tab — Header text contrast
+**Problem:** `.report-header-title` and `.report-header-sub` rendered as dark/black text on the indigo→sky gradient due to Gradio theme overriding inherited `color: white`.
+**Fix:** Added `color: white !important` explicitly to both classes.
+
+### Report Tab — Font sizes
+**Problem:** Report text was noticeably smaller than the practice tab (narrative at `0.95rem`, table at `0.9rem`, pills at `0.85rem`).
+**Fix:** Increased across all report text elements — narrative body `1.1rem`, narrative title `1.25rem`, section titles `1.2rem`, pills `1rem`, session table `1rem`, accuracy badges `0.95rem`, stat labels `0.8rem`, stat sub `0.82rem`.
+
+---
+
+---
+
+## Follow-on: Global Button Redesign
+
+**Status:** Ready
+**Prototype:** `prototype_buttons.html` (side-by-side before/after, approved by Gautam)
+
+### Context
+
+Outside the Practice tab, buttons across the Scores and Report tabs render as plain Gradio defaults — white background, thin grey border, system font. The Practice tab buttons (Submit, Next, Start) already have custom `elem_classes` and polished CSS. This change brings the rest of the app's buttons up to the same standard using Gradio's native variant class selectors.
+
+### Button inventory
+
+| Variant | Buttons | Proposed style |
+|---|---|---|
+| `primary` | Load Student, Extract Scores with Gemma 4, Analyze, Generate Report | Indigo gradient, white Fredoka One text, shadow |
+| `secondary` | Refresh List, Extract Scores, Next →, Cancel | White fill, indigo border + text, Fredoka One |
+| `stop` | Delete Student, Confirm Delete | Red gradient, white Fredoka One text, shadow |
+| `secondary sm` | + Add Score Row, − Remove Last Row | Compact indigo-tinted chip, Fredoka One |
+
+> **Note:** Practice tab buttons (map-start-btn, map-submit-btn, map-next-btn) already have their own `elem_classes` CSS — leave those untouched.
+
+### Implementation
+
+CSS only — no Python changes needed. Add the following block to `theme.custom_css` in `frontend/app.py`:
+
+```css
+/* === Global Button Styles === */
+button.primary {
+    background: linear-gradient(135deg, #4f46e5, #818cf8) !important;
+    color: white !important;
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.02em !important;
+    padding: 0.65rem 1.35rem !important;
+    border-radius: 12px !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.3) !important;
+    transition: all 0.15s ease !important;
+}
+button.primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 18px rgba(79,70,229,0.45) !important;
+}
+button.secondary {
+    background: white !important;
+    color: #4f46e5 !important;
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.02em !important;
+    padding: 0.65rem 1.35rem !important;
+    border-radius: 12px !important;
+    border: 2px solid #818cf8 !important;
+    box-shadow: 0 2px 6px rgba(79,70,229,0.1) !important;
+    transition: all 0.15s ease !important;
+}
+button.secondary:hover {
+    background: #eef2ff !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.2) !important;
+}
+button.stop {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    color: white !important;
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.02em !important;
+    padding: 0.65rem 1.35rem !important;
+    border-radius: 12px !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(220,38,38,0.3) !important;
+    transition: all 0.15s ease !important;
+}
+button.stop:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 18px rgba(220,38,38,0.45) !important;
+}
+button.secondary.sm {
+    font-family: 'Fredoka One', cursive !important;
+    font-size: 0.85rem !important;
+    padding: 0.4rem 0.9rem !important;
+    border-radius: 10px !important;
+    border: 2px solid #c7d2fe !important;
+    background: #eef2ff !important;
+    color: #4338ca !important;
+    box-shadow: none !important;
+}
+button.secondary.sm:hover {
+    background: #e0e7ff !important;
+    transform: translateY(-1px) !important;
+}
+```
+
+> **Note:** The existing `button.primary` rule (~line 2346) is superseded by this block — remove the old rule to avoid conflicts.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `frontend/app.py` | New CSS block added to `theme.custom_css`; old `button.primary` rule removed |
+
+### Verification
+
+1. `just app` — launch Gradio
+2. Scores tab: Load Student (primary), Refresh List (secondary), Delete Student (stop), + Add Score Row (secondary sm) — all styled
+3. Report tab: Generate Report button is indigo gradient
+4. Confirm Delete modal: Confirm Delete (stop) and Cancel (secondary) are styled
+5. Practice tab: Start/Submit/Next buttons are **unchanged** (still using map-* classes)
+6. Hover on each button type — verify lift/shadow transition fires

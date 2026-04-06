@@ -100,6 +100,23 @@ def add_scores(
     return {"student_id": student_id, "scores_added": added}
 
 
+@app.delete("/students/{student_id}")
+def delete_student(student_id: int, db: Session = Depends(get_db)):
+    """Delete a student and all related records (scores, sessions, results, analyses).
+
+    :param student_id: ID of the student to delete.
+    :return: Confirmation message.
+    :raises HTTPException: 404 if student not found.
+    """
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    db.delete(student)
+    db.commit()
+    return {"message": f"Student '{student.name}' deleted"}
+
+
 def _grade_for_score(
     season: str, year: int, current_grade: int, latest_season: str, latest_year: int
 ) -> int:
@@ -405,9 +422,7 @@ def get_progress(
                 needs_work.append(concept)
 
     # Sort sessions chronologically before building summaries
-    sessions = sorted(
-        sessions, key=lambda s: s.completed_at or s.started_at
-    )
+    sessions = sorted(sessions, key=lambda s: s.completed_at or s.started_at)
 
     session_summaries = [
         SessionSummary(

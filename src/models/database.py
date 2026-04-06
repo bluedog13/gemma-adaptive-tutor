@@ -30,9 +30,18 @@ class Student(Base):
     grade = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    scores = relationship("Score", back_populates="student")
-    sessions = relationship("PracticeSession", back_populates="student")
-    analysis = relationship("StudentAnalysis", back_populates="student", uselist=True)
+    scores = relationship(
+        "Score", back_populates="student", cascade="all, delete-orphan"
+    )
+    sessions = relationship(
+        "PracticeSession", back_populates="student", cascade="all, delete-orphan"
+    )
+    analysis = relationship(
+        "StudentAnalysis",
+        back_populates="student",
+        uselist=True,
+        cascade="all, delete-orphan",
+    )
 
 
 class Score(Base):
@@ -68,7 +77,9 @@ class PracticeSession(Base):
     completed_at = Column(DateTime, nullable=True)
 
     student = relationship("Student", back_populates="sessions")
-    results = relationship("ExerciseResultRecord", back_populates="session")
+    results = relationship(
+        "ExerciseResultRecord", back_populates="session", cascade="all, delete-orphan"
+    )
 
 
 class ExerciseResultRecord(Base):

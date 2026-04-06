@@ -138,13 +138,21 @@ _EXERCISE_TYPE_GUIDANCE: dict[str, str] = {
         "correct_answer is the Part A answer.\n"
         "\n"
         "Rules:\n"
-        "- Each question tests ONE concept\n"
+        "- Vary reasoning depth across questions:\n"
+        "  - 2 questions: SINGLE-STEP (difficulty_tier 1) — one concept, "
+        "direct application\n"
+        "  - 2 questions: MULTI-STEP (difficulty_tier 2) — same concept "
+        "but chain 2-3 operations in a word problem. Do NOT hint which "
+        "operations to use\n"
+        "  - 1 question: CHALLENGE (difficulty_tier 3) — combine two "
+        "concepts from the list into one problem that requires the "
+        "student to figure out the approach\n"
         "- Every question ends with a clear question sentence\n"
         "- Include a step-by-step explanation for each answer\n"
         "- Make word problems relatable to a child's everyday life\n"
         "- Aim for roughly: 2 multiple_choice, 1 multi_select, "
         "1 two_part, 1 of any type\n"
-        "- EVERY question MUST have a \"choices\" array with 4 options — "
+        '- EVERY question MUST have a "choices" array with 4 options — '
         "do NOT use fill_in_the_blank"
     ),
     "reading": (
@@ -262,9 +270,7 @@ def build_exercise_prompt(
     # Split them so the LLM sees each as a separate, valid topic name.
     topic_lines: list[str] = []
     for topic_name, concepts in topics.items():
-        individual_topics = [
-            t.strip() for t in topic_name.split(";") if t.strip()
-        ]
+        individual_topics = [t.strip() for t in topic_name.split(";") if t.strip()]
         for indiv in individual_topics:
             topic_lines.append(f"Topic: {indiv}")
             for concept in concepts:
@@ -296,6 +302,7 @@ Each exercise object MUST have ALL of these fields:
 - "choices": array of 4 answer options (REQUIRED for ALL question types)
 - "correct_answer": the correct answer as a string (REQUIRED — never omit this)
 - "explanation": step-by-step explanation of how to solve it
+- "difficulty_tier": integer 1 (single-step), 2 (multi-step), or 3 (challenge)
 
 Additional fields for specific question types:
 - "scenario": passage text shown above the question (REQUIRED for reading and science)

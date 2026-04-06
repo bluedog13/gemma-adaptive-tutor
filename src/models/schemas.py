@@ -104,6 +104,9 @@ class Exercise(BaseModel):
     # Scenario / passage context
     scenario: str | None = None
 
+    # Reasoning depth tier: 1=single-step, 2=multi-step, 3=challenge
+    difficulty_tier: int | None = None
+
 
 class ExerciseSet(BaseModel):
     student_name: str
