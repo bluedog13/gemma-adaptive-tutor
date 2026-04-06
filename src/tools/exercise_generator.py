@@ -181,6 +181,27 @@ def _normalize_list(raw: list | None) -> list[str] | None:
     return [str(c[0]) if isinstance(c, list) else str(c) for c in raw]
 
 
+def _repair_json(raw: str) -> str:
+    """Best-effort repair of common JSON issues from Gemma output.
+
+    Fixes trailing commas, missing commas between objects, and other
+    minor syntax errors that cause ``json.loads`` to fail.
+
+    :param raw: Raw JSON string.
+    :return: Repaired JSON string.
+    """
+    import re as _re
+
+    text = raw.strip()
+    # Remove trailing commas before ] or }
+    text = _re.sub(r",\s*([}\]])", r"\1", text)
+    # Add missing commas between }{ or }  { (objects in an array)
+    text = _re.sub(r"}\s*{", "},{", text)
+    # Add missing commas between }"  (end of object, start of string key)
+    text = _re.sub(r'}\s*"', '},"', text)
+    return text
+
+
 def _parse_exercises(content: str) -> list[Exercise]:
     """Parse raw JSON from Gemma into a list of Exercise objects.
 
@@ -190,7 +211,12 @@ def _parse_exercises(content: str) -> list[Exercise]:
     :param content: Raw JSON string from Gemma.
     :return: List of parsed exercises (may include broken ones).
     """
-    parsed = json.loads(content)
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        logger.warning("JSON parse failed, attempting repair")
+        repaired = _repair_json(content)
+        parsed = json.loads(repaired)
 
     # Handle both array and object responses
     if isinstance(parsed, dict):
