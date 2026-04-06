@@ -1034,30 +1034,49 @@ def _format_choices(ex: dict, subject: str) -> list[str]:
 
 
 def _build_question_html(
-    idx: int, ex: dict, total: int, part_label: str | None = None
+    idx: int, ex: dict, total: int, pstate: dict | None = None, part_label: str | None = None
 ) -> str:
-    """Build the common question HTML (progress, banner, scenario, question).
+    """Build the common question HTML (topbar, progress bar, topic chip, question).
 
     :param idx: Current exercise index.
     :param ex: Exercise dict.
     :param total: Total number of exercises.
+    :param pstate: Practice state dict (used for subject display).
     :param part_label: Optional "Part A" / "Part B" label.
     :return: HTML string.
     """
     concept = html.escape(ex["concept"])
     question = html.escape(ex["question"]).replace("\n", "<br>")
+    subject = (pstate or {}).get("subject", "math")
+    subject_emoji = {
+        "math": "🔢",
+        "language arts: reading": "📚",
+        "science": "🔬",
+    }.get(subject.lower(), "📖")
+    from src.models.schemas import SUBJECT_DISPLAY as _SD
+    subject_display = _SD.get(subject, subject.title())
 
-    progress_counter = (
-        f'<div class="map-progress-counter">Question {idx + 1} of {total}</div>'
+    # Progress bar width as percentage
+    progress_pct = int(((idx) / total) * 100) if total > 0 else 0
+
+    topbar = (
+        f'<div class="map-topbar">'
+        f'<span class="map-topbar-subject">{subject_emoji} {subject_display}</span>'
+        f'</div>'
+        f'<div class="map-progress-area">'
+        f'<div class="map-progress-bar-wrap">'
+        f'<div class="map-progress-fill" style="width:{progress_pct}%"></div>'
+        f'</div>'
+        f'<span class="map-progress-label">{idx + 1} of {total}</span>'
+        f'</div>'
     )
-    banner = f'<div class="map-banner">{concept}</div>'
 
     scenario_html = ""
     if ex.get("scenario"):
         scenario_text = html.escape(ex["scenario"]).replace("\n", "<br>")
         scenario_html = (
             f'<div class="map-scenario-box">'
-            f'<div class="map-scenario-label">Read the passage</div>'
+            f'<div class="map-scenario-label">📖 Read This First</div>'
             f"{scenario_text}</div>"
         )
 
@@ -1067,13 +1086,13 @@ def _build_question_html(
 
     question_area = (
         f'<div class="map-question-area">'
+        f'<div class="map-topic-chip">{concept}</div>'
         f"{scenario_html}"
         f"{part_html}"
         f'<p class="map-question-text">{question}</p>'
         f"</div>"
-        f'<hr class="map-blue-rule">'
     )
-    return f"{progress_counter}{banner}{question_area}"
+    return f"{topbar}{question_area}"
 
 
 def _hidden_all_inputs():
@@ -1106,7 +1125,7 @@ def _format_exercise(idx: int, pstate: dict):
 
     # --- Two-part: Part A ---
     if q_type == "two_part" and ex.get("choices"):
-        question_html = _build_question_html(idx, ex, total, part_label="Part A")
+        question_html = _build_question_html(idx, ex, total, pstate=pstate, part_label="Part A")
         choices = _format_choices(ex, subject)
         return (
             question_html,
@@ -1120,7 +1139,7 @@ def _format_exercise(idx: int, pstate: dict):
     # --- Multi-select ---
     if q_type == "multi_select" and ex.get("choices"):
         num_correct = ex.get("num_correct", 2)
-        question_html = _build_question_html(idx, ex, total)
+        question_html = _build_question_html(idx, ex, total, pstate=pstate)
         # Add instruction to the question
         question_html += f'<p class="map-instruction">Choose {num_correct} answers.</p>'
         choices = _format_choices(ex, subject)
@@ -1135,7 +1154,7 @@ def _format_exercise(idx: int, pstate: dict):
 
     # --- Sequence ordering ---
     if q_type == "sequence_order" and ex.get("items_to_order"):
-        question_html = _build_question_html(idx, ex, total)
+        question_html = _build_question_html(idx, ex, total, pstate=pstate)
         items_list = "".join(
             f"<li>{html.escape(item)}</li>" for item in ex["items_to_order"]
         )
@@ -1156,7 +1175,7 @@ def _format_exercise(idx: int, pstate: dict):
 
     # --- Table matching ---
     if q_type == "table_matching" and ex.get("match_pairs"):
-        question_html = _build_question_html(idx, ex, total)
+        question_html = _build_question_html(idx, ex, total, pstate=pstate)
         options = ex.get("match_options", [])
         options_str = ", ".join(html.escape(o) for o in options)
         rows_html = ""
@@ -1183,7 +1202,7 @@ def _format_exercise(idx: int, pstate: dict):
 
     # --- Standard multiple choice ---
     if q_type == "multiple_choice" and ex.get("choices"):
-        question_html = _build_question_html(idx, ex, total)
+        question_html = _build_question_html(idx, ex, total, pstate=pstate)
         choices = _format_choices(ex, subject)
         return (
             question_html,
@@ -1195,7 +1214,7 @@ def _format_exercise(idx: int, pstate: dict):
         )
 
     # --- Fill-in-the-blank / fallback ---
-    question_html = _build_question_html(idx, ex, total)
+    question_html = _build_question_html(idx, ex, total, pstate=pstate)
     return (
         question_html,
         gr.update(visible=True, value=""),
@@ -1365,7 +1384,7 @@ def submit_answer(
                 "choices": ex["part_b_choices"],
             }
             question_html = _build_question_html(
-                idx, ex, len(exercises), part_label="Part B"
+                idx, ex, len(exercises), pstate=pstate, part_label="Part B"
             )
             # Override question text with Part B question
             q_text = html.escape(ex["part_b_question"]).replace("\n", "<br>")
@@ -1374,17 +1393,11 @@ def submit_answer(
                 s_text = html.escape(ex["scenario"]).replace("\n", "<br>")
                 scenario_html = (
                     f'<div class="map-scenario-box">'
-                    f'<div class="map-scenario-label">Read the passage</div>'
+                    f'<div class="map-scenario-label">📖 Read This First</div>'
                     f"{s_text}</div>"
                 )
-            question_html = (
-                f'<div class="map-progress-counter">'
-                f"Question {idx + 1} of {len(exercises)}</div>"
-                f'<div class="map-banner">{html.escape(ex["concept"])}</div>'
-                f'<div class="map-question-area">{scenario_html}'
-                f'<span class="map-part-label">Part B</span> '
-                f'<p class="map-question-text">{q_text}</p></div>'
-                f'<hr class="map-blue-rule">'
+            question_html = _build_question_html(
+                idx, ex, len(exercises), pstate=pstate, part_label="Part B"
             )
             choices_b = _format_choices(part_b_ex, subject)
             return (
@@ -1829,7 +1842,7 @@ def _show_results(pstate: dict):
 
     results_html = (
         '<div class="map-results-card">'
-        '<div class="map-banner">Session Complete</div>'
+        '<h2>🎉 Session Complete!</h2>'
         f'<div class="map-score-big">{correct}/{total}</div>'
         f'<div class="map-score-pct">{pct:.0f}% correct</div>'
         "<h3>Concept Breakdown</h3>"
@@ -1971,7 +1984,6 @@ theme = gr.themes.Soft(
     font_mono=("JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"),
 )
 theme.custom_css = """
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
 .gradio-container { background-color: #f9fafb !important; font-family: 'Nunito', 'Inter', system-ui, sans-serif !important; }
 .tabitem { border-radius: 16px !important; padding: 2rem !important; border: 1px solid #e5e7eb !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important; margin-top: 1rem; }
 .card-section { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid #f3f4f6; margin-bottom: 1rem; }
@@ -2003,96 +2015,117 @@ button.primary:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px
 .trend-list { list-style: none; padding: 0; margin: 0.75rem 0 0 0; display: flex; flex-direction: column; gap: 0.6rem; }
 .trend-item { background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 10px; padding: 0.85rem 1.1rem; color: #374151; font-size: 0.95rem; line-height: 1.6; }
 
-/* === MAP Practice Tab — scoped under #map-practice-wrapper === */
-#map-practice-wrapper { font-family: Arial, Helvetica, sans-serif !important; background: #fff; padding: 1.5rem 0; }
-#map-practice-wrapper * { font-family: Arial, Helvetica, sans-serif !important; }
-#map-practice-wrapper > div { margin-bottom: 1rem; }
-#map-practice-wrapper .wrap input[type="range"] + .rangeSlider { font-size: 16px !important; }
-#map-practice-wrapper input[type="number"] { font-size: 18px !important; font-weight: 700 !important; width: 3rem !important; }
-#map-practice-wrapper .slider-label span, #map-practice-wrapper label span { font-size: 15px !important; }
-.map-banner { background: #1b6d7c; color: #fff; font-size: 15px; font-weight: 400; padding: 0.6rem 1rem; margin-bottom: 0; line-height: 1.5; }
-.map-question-area { background: #fff; padding: 1.5rem 1.25rem 1rem; }
-.map-question-text { font-size: 16px; color: #333; font-weight: 400; line-height: 1.6; margin: 0; }
-.map-blue-rule { border: none; border-top: 2px solid #3b8bc5; margin: 1rem 0; }
-.map-progress-counter { font-size: 13px; color: #666; text-align: right; margin-bottom: 0.5rem; }
+/* === Practice Tab — Kid-Friendly Redesign === */
+#map-practice-wrapper { font-family: 'Nunito', sans-serif !important; background: #f0f9ff; padding: 0 0 1.5rem 0; }
+#map-practice-wrapper * { font-family: 'Nunito', sans-serif !important; }
+
+/* Top bar: gradient header with subject emoji */
+.map-topbar { background: linear-gradient(135deg, #4f46e5 0%, #38bdf8 100%); padding: 0.85rem 1.25rem; display: flex; align-items: center; color: white; border-radius: 12px 12px 0 0; margin-bottom: 0; }
+.map-topbar-subject { font-family: 'Fredoka One', cursive !important; font-size: 1.15rem; letter-spacing: 0.03em; display: flex; align-items: center; gap: 0.5rem; }
+
+/* Progress bar */
+.map-progress-area { background: #e0f7ff; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0; }
+.map-progress-bar-wrap { flex: 1; background: rgba(255,255,255,0.8); border-radius: 50px; height: 12px; overflow: hidden; border: 2px solid #38bdf8; }
+.map-progress-fill { height: 100%; background: linear-gradient(90deg, #4f46e5, #38bdf8); border-radius: 50px; transition: width 0.4s ease; }
+.map-progress-label { font-size: 0.85rem; font-weight: 800; color: #4f46e5; white-space: nowrap; }
+
+/* Question body */
+.map-question-area { background: #ffffff; padding: 1.25rem 1.4rem 1rem; }
+
+/* Topic chip (replaces flat banner) */
+.map-topic-chip { display: inline-flex; align-items: center; gap: 0.4rem; background: linear-gradient(135deg, #e0e7ff, #dbeafe); color: #3730a3; font-size: 0.8rem; font-weight: 800; padding: 0.35rem 0.9rem; border-radius: 50px; margin-bottom: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Question text */
+.map-question-text { font-size: 1.25rem; font-weight: 700; color: #1e293b; line-height: 1.6; margin: 0 0 1rem 0; }
+
+/* Answer choices: rounded tiles */
 #map-practice-wrapper .map-radio-choices label {
     display: flex !important; align-items: center !important;
-    background: #fff !important; border: none !important;
-    border-bottom: 1px solid #e0e0e0 !important; border-radius: 0 !important;
-    padding: 0.7rem 1rem !important; margin-bottom: 0 !important;
-    font-size: 15px !important; color: #333 !important;
-    cursor: pointer !important; line-height: 1.5 !important; gap: 0.5rem !important;
+    gap: 0.75rem !important; padding: 0.75rem 1rem !important;
+    border-radius: 14px !important; border: 2.5px solid #e2e8f0 !important;
+    background: #f1f5f9 !important; margin-bottom: 0.55rem !important;
+    font-size: 0.95rem !important; font-weight: 600 !important; color: #1e293b !important;
+    cursor: pointer !important; line-height: 1.5 !important; transition: all 0.15s ease !important;
 }
-#map-practice-wrapper .map-radio-choices label:first-child { border-top: 1px solid #e0e0e0 !important; }
-#map-practice-wrapper .map-radio-choices label:hover { background: #f5f8fc !important; }
-#map-practice-wrapper .map-radio-choices input[type="radio"] {
-    width: 18px !important; height: 18px !important;
-    border: 2px solid #3b8bc5 !important; accent-color: #3b8bc5 !important;
-}
-#map-practice-wrapper .map-text-input textarea {
-    font-size: 15px !important; padding: 0.5rem 0.6rem !important;
-    border: 1px solid #333 !important; border-radius: 2px !important;
-    line-height: 1.5 !important; max-width: 200px !important;
-}
-#map-practice-wrapper .map-text-input textarea:focus {
-    border-color: #3b8bc5 !important; outline: 2px solid #3b8bc5 !important;
-}
-#map-practice-wrapper .map-submit-btn {
-    background: #1b6d7c !important; color: #fff !important;
-    font-size: 15px !important; font-weight: 600 !important;
-    padding: 0.6rem 2rem !important; border-radius: 3px !important; border: none !important;
-}
-#map-practice-wrapper .map-submit-btn:hover { background: #155d6a !important; }
-#map-practice-wrapper .map-next-btn {
-    background: #fff !important; color: #1b6d7c !important;
-    border: 1px solid #1b6d7c !important; font-size: 15px !important;
-    font-weight: 600 !important; padding: 0.6rem 2rem !important; border-radius: 3px !important;
-}
-#map-practice-wrapper .map-next-btn:hover { background: #f0f7f8 !important; }
-.map-feedback-correct { background: #f0fdf4; border-left: 3px solid #22c55e; padding: 1rem 1.25rem; margin-top: 1rem; }
-.map-feedback-correct h3 { color: #15803d; font-size: 16px; margin: 0 0 0.4rem 0; font-weight: 700; }
-.map-feedback-correct p { color: #333; font-size: 15px; margin: 0.2rem 0; line-height: 1.6; }
-.map-feedback-incorrect { background: #fef2f2; border-left: 3px solid #ef4444; padding: 1rem 1.25rem; margin-top: 1rem; }
-.map-feedback-incorrect h3 { color: #dc2626; font-size: 16px; margin: 0 0 0.4rem 0; font-weight: 700; }
-.map-feedback-incorrect p { color: #333; font-size: 15px; margin: 0.2rem 0; line-height: 1.6; }
-.map-session-complete { font-size: 14px; color: #1b6d7c; text-align: center; margin-top: 1rem; font-weight: 600; }
-.map-results-card { background: #fff; padding: 1.5rem 1.25rem; line-height: 1.6; }
-.map-results-card h2 { color: #1b6d7c; font-size: 20px; border-bottom: 2px solid #3b8bc5; padding-bottom: 0.5rem; font-weight: 700; }
-.map-score-big { font-size: 42px; font-weight: 700; color: #1b6d7c; text-align: center; margin: 1rem 0 0.25rem 0; }
-.map-score-pct { text-align: center; color: #666; font-size: 15px; margin-bottom: 1rem; }
-.map-results-card h3 { color: #333; font-size: 16px; margin-top: 1.25rem; font-weight: 700; }
-.map-results-card ul { list-style: none; padding: 0; margin: 0; }
-.map-results-card li { padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0; font-size: 15px; color: #333; }
-.map-results-followup { background: #f5f8fc; padding: 1rem 1.25rem; margin-top: 1.25rem; font-size: 15px; color: #333; line-height: 1.6; border-left: 3px solid #1b6d7c; }
+#map-practice-wrapper .map-radio-choices label:hover { border-color: #818cf8 !important; background: #eef2ff !important; transform: translateX(3px) !important; }
+#map-practice-wrapper .map-radio-choices input[type="radio"] { width: 20px !important; height: 20px !important; accent-color: #4f46e5 !important; flex-shrink: 0 !important; }
 
-/* MAP scenario/passage box */
-.map-scenario-box { background: #f9fafb; border: 1px solid #d1d5db; border-radius: 4px; padding: 1.25rem 1.25rem; margin-bottom: 1rem; font-size: 15px; color: #333; line-height: 1.8; }
-.map-scenario-box .map-scenario-label { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+/* Text answer input */
+#map-practice-wrapper .map-text-input textarea {
+    font-size: 1rem !important; padding: 0.6rem 0.8rem !important;
+    border: 2.5px solid #cbd5e1 !important; border-radius: 12px !important;
+    line-height: 1.5 !important; max-width: 240px !important;
+}
+#map-practice-wrapper .map-text-input textarea:focus { border-color: #4f46e5 !important; outline: none !important; box-shadow: 0 0 0 3px rgba(79,70,229,0.15) !important; }
+
+/* Submit button */
+#map-practice-wrapper .map-submit-btn {
+    background: linear-gradient(135deg, #4f46e5, #818cf8) !important; color: #fff !important;
+    font-family: 'Fredoka One', cursive !important; font-size: 1.05rem !important;
+    padding: 0.8rem 1.5rem !important; border-radius: 14px !important; border: none !important;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.35) !important; transition: all 0.15s ease !important; letter-spacing: 0.03em !important;
+}
+#map-practice-wrapper .map-submit-btn:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 16px rgba(79,70,229,0.45) !important; }
+
+/* Next button */
+#map-practice-wrapper .map-next-btn {
+    background: #ffffff !important; color: #4f46e5 !important;
+    font-family: 'Fredoka One', cursive !important; font-size: 1.05rem !important;
+    border: 2.5px solid #818cf8 !important; padding: 0.8rem 1.2rem !important;
+    border-radius: 14px !important; transition: all 0.15s ease !important; letter-spacing: 0.03em !important;
+}
+#map-practice-wrapper .map-next-btn:hover { background: #eef2ff !important; transform: translateY(-2px) !important; }
+
+/* Start Practice button */
+#map-practice-wrapper .map-start-btn {
+    background: linear-gradient(135deg, #34d399, #059669) !important; color: #fff !important;
+    font-family: 'Fredoka One', cursive !important; font-size: 1rem !important;
+    padding: 0.75rem 1.5rem !important; border-radius: 14px !important; border: none !important;
+    box-shadow: 0 4px 12px rgba(52,211,153,0.4) !important; transition: all 0.15s ease !important; letter-spacing: 0.03em !important;
+}
+#map-practice-wrapper .map-start-btn:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 16px rgba(52,211,153,0.5) !important; }
+
+/* Session complete */
+.map-session-complete { font-family: 'Fredoka One', cursive; font-size: 1.1rem; color: #4f46e5; text-align: center; margin-top: 1rem; }
+
+/* Results card */
+.map-results-card { background: #fff; padding: 1.5rem 1.25rem; line-height: 1.6; border-radius: 16px; }
+.map-results-card h2 { font-family: 'Fredoka One', cursive; color: #4f46e5; font-size: 1.4rem; border-bottom: 3px solid #e0e7ff; padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: normal; }
+.map-score-big { font-family: 'Fredoka One', cursive; font-size: 3rem; color: #4f46e5; text-align: center; margin: 1rem 0 0.25rem; }
+.map-score-pct { text-align: center; color: #64748b; font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+.map-results-card h3 { font-family: 'Fredoka One', cursive; color: #1e293b; font-size: 1.1rem; margin-top: 1.25rem; font-weight: normal; }
+.map-results-card ul { list-style: none; padding: 0; margin: 0; }
+.map-results-card li { padding: 0.6rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; color: #374151; font-weight: 600; }
+.map-results-followup { background: #eef2ff; padding: 1rem 1.25rem; margin-top: 1.25rem; font-size: 0.95rem; color: #1e293b; line-height: 1.6; border-left: 4px solid #4f46e5; border-radius: 0 12px 12px 0; }
+
+/* Scenario / passage box */
+.map-scenario-box { background: linear-gradient(135deg, #fffbeb, #fef9c3); border: 2px solid #fde68a; border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: 0.9rem; font-size: 1.15rem; color: #44403c; line-height: 1.7; }
+.map-scenario-box .map-scenario-label { font-size: 0.72rem; font-weight: 900; color: #92400e; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
 
 /* Part A / Part B labels */
-.map-part-label { display: inline-block; background: #1b6d7c; color: #fff; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 3px; margin-bottom: 0.5rem; }
+.map-part-label { display: inline-block; background: linear-gradient(135deg, #4f46e5, #818cf8); color: #fff; font-family: 'Fredoka One', cursive; font-size: 0.85rem; padding: 3px 12px; border-radius: 50px; margin-bottom: 0.5rem; letter-spacing: 0.03em; }
 
-/* Checkbox group styling for multi-select */
+/* Checkbox group — multi-select */
 #map-practice-wrapper .map-checkbox-choices label {
     display: flex !important; align-items: center !important;
-    background: #fff !important; border: none !important;
-    border-bottom: 1px solid #e0e0e0 !important; border-radius: 0 !important;
-    padding: 0.7rem 1rem !important; margin-bottom: 0 !important;
-    font-size: 15px !important; color: #333 !important;
-    cursor: pointer !important; line-height: 1.5 !important; gap: 0.5rem !important;
+    gap: 0.75rem !important; padding: 0.75rem 1rem !important;
+    border-radius: 14px !important; border: 2.5px solid #e2e8f0 !important;
+    background: #f1f5f9 !important; margin-bottom: 0.55rem !important;
+    font-size: 0.95rem !important; font-weight: 600 !important; color: #1e293b !important;
+    cursor: pointer !important; line-height: 1.5 !important; transition: all 0.15s ease !important;
 }
-#map-practice-wrapper .map-checkbox-choices label:first-child { border-top: 1px solid #e0e0e0 !important; }
-#map-practice-wrapper .map-checkbox-choices label:hover { background: #f5f8fc !important; }
-#map-practice-wrapper .map-checkbox-choices input[type="checkbox"] {
-    width: 18px !important; height: 18px !important;
-    border: 2px solid #3b8bc5 !important; accent-color: #3b8bc5 !important;
-}
+#map-practice-wrapper .map-checkbox-choices label:hover { border-color: #818cf8 !important; background: #eef2ff !important; }
+#map-practice-wrapper .map-checkbox-choices input[type="checkbox"] { width: 20px !important; height: 20px !important; accent-color: #4f46e5 !important; flex-shrink: 0 !important; border-radius: 6px !important; }
 
-/* Sequence / matching instruction text */
-.map-instruction { font-size: 14px; color: #1b6d7c; font-weight: 600; margin-bottom: 0.5rem; }
-.map-match-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 15px; }
-.map-match-table th { background: #f0f4f8; padding: 0.5rem 0.75rem; text-align: left; border-bottom: 2px solid #3b8bc5; font-weight: 700; color: #333; }
-.map-match-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e0e0e0; color: #333; }
+/* Instruction + match table */
+.map-instruction { font-size: 0.9rem; color: #4f46e5; font-weight: 700; margin-bottom: 0.5rem; }
+.map-match-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.95rem; }
+.map-match-table th { background: #e0e7ff; padding: 0.5rem 0.75rem; text-align: left; border-bottom: 2px solid #818cf8; font-weight: 800; color: #3730a3; }
+.map-match-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #f1f5f9; color: #374151; font-weight: 600; }
+
+/* === Tab & Section Header Font Sizes === */
+.tab-container > button { font-family: 'Fredoka One', cursive !important; font-size: 1.1rem !important; letter-spacing: 0.02em !important; }
+.prose h3 { font-size: 1.2rem !important; font-weight: 900 !important; }
 """
 
 custom_css = theme.custom_css
@@ -2356,10 +2389,10 @@ def _build_practice_tab(subject: str, student_id_state):
                 show_label=True,
             )
             start_btn = gr.Button(
-                "Start Practice",
+                "▶ Start Practice!",
                 variant="primary",
                 scale=1,
-                elem_classes=["map-submit-btn"],
+                elem_classes=["map-start-btn"],
             )
 
         question_display = gr.HTML(label="Question")
@@ -2419,12 +2452,22 @@ def _build_practice_tab(subject: str, student_id_state):
         return (*result, gr.update(visible=has_exercises))
 
     def _submit(text_ans, radio_ans, checkbox_ans, ps):
-        result = submit_answer(text_ans, radio_ans, checkbox_ans, ps)
+        result = list(submit_answer(text_ans, radio_ans, checkbox_ans, ps))
+        # Ensure feedback_display (index 4) is visible when it has content
+        fb = result[4]
+        if fb and isinstance(fb, str) and fb.strip():
+            result[4] = gr.update(visible=True, value=fb)
         return (*result, gr.update())
 
     def _next(ps):
-        result = next_question(ps)
-        return (*result, gr.update())
+        result = list(next_question(ps))
+        # Hide feedback when moving to next question
+        result[4] = gr.update(visible=False, value="")
+        # Hide button row when session results are showing
+        idx = ps.get("exercise_idx", 0)
+        exercises = ps.get("exercises", [])
+        btn_visible = idx < len(exercises)
+        return (*result, gr.update(visible=btn_visible))
 
     start_btn.click(
         fn=_start,
@@ -2460,7 +2503,10 @@ def _build_report_tab(subject: str, student_id_state):
     )
 
 
-with gr.Blocks(title="MAP Accelerator") as demo:
+with gr.Blocks(
+    title="MAP Accelerator",
+    head='<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">',
+) as demo:
     gr.HTML("""
         <div style="text-align: center; padding: 2rem 0;">
             <h1 style="font-size: 2.5rem; font-weight: 800; color: #1e1b4b; margin-bottom: 0.5rem;">MAP Accelerator</h1>
@@ -2496,11 +2542,11 @@ with gr.Blocks(title="MAP Accelerator") as demo:
             with gr.Tab(f"{subj_icon} {subj_display}"):
                 student_id_state = gr.State("")
                 with gr.Tabs():
-                    with gr.Tab("Scores"):
+                    with gr.Tab("📊 Scores"):
                         _build_scores_tab(subj, student_id_state, student_dropdown)
-                    with gr.Tab("Practice"):
+                    with gr.Tab("🎯 Practice"):
                         _build_practice_tab(subj, student_id_state)
-                    with gr.Tab("Report"):
+                    with gr.Tab("📋 Report"):
                         _build_report_tab(subj, student_id_state)
 
 

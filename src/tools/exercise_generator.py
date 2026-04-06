@@ -2,6 +2,7 @@
 
 import json
 import logging
+import random
 
 import ollama
 
@@ -19,81 +20,158 @@ _REQUIRED_FIELDS_BY_TYPE: dict[str, list[str]] = {
     "table_matching": ["match_pairs", "match_options"],
 }
 
-_SCENARIO_REQUIRED_SUBJECTS = {"reading", "science"}
+
+_VALID_QUESTION_TYPES = {
+    "multiple_choice",
+    "multi_select",
+    "fill_in_the_blank",
+    "two_part",
+    "sequence_order",
+    "table_matching",
+}
 
 
-def _validate_exercises(
-    exercises: list[Exercise],
-    num_questions: int,
-    subject: str,
-    topics: dict[str, list[str]] | None = None,
-) -> list[str]:
-    """Validate parsed exercises against prompt contract.
+def _generate_distractors(correct: str) -> list[str]:
+    """Generate 3 plausible distractors + the correct answer as choices.
 
-    :param exercises: Parsed exercise list.
-    :param num_questions: Expected number of exercises.
-    :param subject: Subject (used to check scenario requirement).
-    :param topics: Allowed topic-to-concepts mapping from the band. When
-        provided, concept and topic values are checked against this set.
-    :return: List of validation error messages (empty if valid).
+    Uses simple heuristics: if the answer looks numeric, vary the number.
+    Otherwise, create generic wrong-answer labels.
+
+    :param correct: The correct answer string.
+    :return: List of 4 choices with the correct answer at a random position.
     """
-    errors: list[str] = []
+    distractors: list[str] = []
 
-    if len(exercises) != num_questions:
-        errors.append(
-            f"Expected {num_questions} exercises, got {len(exercises)}"
-        )
+    # Try numeric distractors
+    try:
+        num = float(correct.replace(",", ""))
+        # Generate nearby values
+        offsets = random.sample([-3, -2, -1, 1, 2, 3], 3)
+        for off in offsets:
+            d = num + off
+            # Keep same format (int vs float)
+            if num == int(num):
+                distractors.append(str(int(d)))
+            else:
+                distractors.append(f"{d:.{len(correct.split('.')[-1])}f}")
+    except (ValueError, IndexError):
+        # Non-numeric — use generic labels
+        distractors = [
+            f"Not {correct}",
+            "None of the above",
+            "Cannot be determined",
+        ]
 
-    # Build allowed sets for semantic validation (case-insensitive)
-    allowed_topics: set[str] | None = None
-    allowed_concepts: set[str] | None = None
-    if topics:
-        allowed_topics = {t.lower() for t in topics}
-        allowed_concepts = {
-            c.lower() for concepts in topics.values() for c in concepts
-        }
+    choices = distractors + [correct]
+    random.shuffle(choices)
+    return choices
 
-    for i, ex in enumerate(exercises):
-        prefix = f"Exercise {i + 1}"
 
-        # Required base fields must be non-empty
-        if not ex.concept.strip():
-            errors.append(f"{prefix}: missing concept")
-        if not ex.question.strip():
-            errors.append(f"{prefix}: missing question")
-        if not ex.correct_answer.strip():
-            errors.append(f"{prefix}: missing correct_answer")
+def _salvage_exercise(ex: Exercise) -> Exercise | None:
+    """Attempt to salvage an exercise by demoting its type if needed.
 
-        # Semantic: concept and topic must match the supplied band
-        if allowed_topics is not None and ex.topic.strip():
-            if ex.topic.strip().lower() not in allowed_topics:
-                errors.append(
-                    f"{prefix}: topic '{ex.topic}' not in allowed topics"
-                )
-        if allowed_concepts is not None and ex.concept.strip():
-            if ex.concept.strip().lower() not in allowed_concepts:
-                errors.append(
-                    f"{prefix}: concept '{ex.concept}' not in allowed concepts"
-                )
+    If an exercise has the core fields (question + correct_answer) but is
+    missing type-specific fields (e.g. multi_select without choices), demote
+    it to fill_in_the_blank rather than dropping it entirely.
 
-        # Scenario required for reading and science
-        if subject in _SCENARIO_REQUIRED_SUBJECTS and not ex.scenario:
-            errors.append(f"{prefix}: missing scenario (required for {subject})")
+    :param ex: Parsed exercise.
+    :return: The (possibly demoted) exercise, or None if unsalvageable.
+    """
+    # Must have question text and a correct answer — can't salvage without these
+    if not ex.question.strip() or not ex.correct_answer.strip():
+        return None
 
-        # Type-specific required fields
-        required = _REQUIRED_FIELDS_BY_TYPE.get(ex.question_type, [])
-        for field in required:
-            if getattr(ex, field, None) is None:
-                errors.append(
-                    f"{prefix} ({ex.question_type}): missing {field}"
-                )
+    q_type = ex.question_type
 
-        # MC-style types need choices
-        if ex.question_type in ("multiple_choice", "multi_select", "two_part"):
-            if not ex.choices:
-                errors.append(f"{prefix} ({ex.question_type}): missing choices")
+    # Sequence/table types require typing comma-separated values which
+    # is poor UX for young students. Convert to MC.
+    if q_type in ("sequence_order", "table_matching"):
+        if ex.choices:
+            ex.question_type = "multiple_choice"
+        else:
+            # Will be handled by the missing-choices block below
+            ex.question_type = "multiple_choice"
+        q_type = ex.question_type
 
-    return errors
+    # Any type that's missing choices: generate distractors from the
+    # correct answer so we always show clickable radio buttons.
+    if not ex.choices and ex.correct_answer.strip():
+        ex.choices = _generate_distractors(ex.correct_answer.strip())
+        ex.question_type = "multiple_choice"
+        q_type = "multiple_choice"
+
+    # Type-specific required fields
+    required = _REQUIRED_FIELDS_BY_TYPE.get(q_type, [])
+    missing = [f for f in required if getattr(ex, f, None) is None]
+    if missing:
+        if ex.choices:
+            ex.question_type = "multiple_choice"
+        else:
+            ex.question_type = "fill_in_the_blank"
+
+    return ex
+
+
+def _build_allowed_sets(
+    topics: dict[str, list[str]],
+) -> tuple[set[str], set[str]]:
+    """Build allowed topic and concept sets from band data.
+
+    Handles semicolon-separated compound topic names and also adds each
+    topic name (and its parts) as an allowed concept, since the LLM
+    frequently uses a topic name as the concept value.
+
+    :param topics: Topic-to-concepts mapping from the band.
+    :return: (allowed_topics, allowed_concepts) both lowercased.
+    """
+    allowed_topics: set[str] = set()
+    allowed_concepts: set[str] = set()
+
+    for t, concepts in topics.items():
+        allowed_topics.add(t.lower())
+        for part in t.split(";"):
+            stripped = part.strip().lower()
+            if stripped:
+                allowed_topics.add(stripped)
+                # Allow topic names as concept values — the LLM often
+                # uses e.g. "volume" as the concept for topic "Volume".
+                allowed_concepts.add(stripped)
+        for c in concepts:
+            allowed_concepts.add(c.lower())
+
+    return allowed_topics, allowed_concepts
+
+
+def _fixup_exercise(
+    ex: Exercise,
+    allowed_topics: set[str],
+    allowed_concepts: set[str],
+) -> Exercise:
+    """Best-effort repair of topic/concept values.
+
+    If the LLM returned a concept that matches a topic name (or vice
+    versa), swap them into the right field. This avoids rejecting
+    otherwise-good exercises over minor labelling issues.
+
+    :param ex: Exercise to fix up.
+    :param allowed_topics: Allowed topic names (lowercased).
+    :param allowed_concepts: Allowed concept names (lowercased).
+    :return: Possibly-modified exercise.
+    """
+    topic_lc = ex.topic.strip().lower()
+    concept_lc = ex.concept.strip().lower()
+
+    # If concept value is actually a topic name and topic value is a
+    # concept name, they were swapped.
+    if (
+        concept_lc in allowed_topics
+        and concept_lc not in allowed_concepts
+        and topic_lc in allowed_concepts
+        and topic_lc not in allowed_topics
+    ):
+        ex.topic, ex.concept = ex.concept, ex.topic
+
+    return ex
 
 
 def _normalize_list(raw: list | None) -> list[str] | None:
@@ -103,35 +181,15 @@ def _normalize_list(raw: list | None) -> list[str] | None:
     return [str(c[0]) if isinstance(c, list) else str(c) for c in raw]
 
 
-def generate_exercises(
-    student_name: str,
-    grade: int,
-    band: BandInfo,
-    num_questions: int = 5,
-    weak_concepts: list[str] | None = None,
-    subject: str = "math",
-) -> ExerciseSet:
-    """Generate exercises using Gemma 4."""
+def _parse_exercises(content: str) -> list[Exercise]:
+    """Parse raw JSON from Gemma into a list of Exercise objects.
 
-    prompt = build_exercise_prompt(
-        student_name=student_name,
-        grade=grade,
-        band_name=band.band,
-        topics=band.topics,
-        num_questions=num_questions,
-        weak_concepts=weak_concepts,
-        subject=subject,
-    )
+    Handles both array and ``{"exercises": [...]}`` formats, normalizes
+    field values, and coerces unrecognized question types.
 
-    response = ollama.chat(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        format="json",
-    )
-
-    content = response.message.content.strip()
-
-    # Parse the JSON response
+    :param content: Raw JSON string from Gemma.
+    :return: List of parsed exercises (may include broken ones).
+    """
     parsed = json.loads(content)
 
     # Handle both array and object responses
@@ -140,8 +198,15 @@ def generate_exercises(
     else:
         exercises_data = parsed
 
-    exercises = []
+    # If Gemma returned a single dict (not wrapped), ensure it's a list
+    if isinstance(exercises_data, dict):
+        exercises_data = [exercises_data]
+
+    exercises: list[Exercise] = []
     for ex in exercises_data:
+        if not isinstance(ex, dict):
+            continue
+
         # Normalize choices — Gemma sometimes returns nested lists
         raw_choices = ex.get("choices")
         choices = _normalize_list(raw_choices)
@@ -158,14 +223,28 @@ def generate_exercises(
             match_pairs = None
         match_options = _normalize_list(ex.get("match_options"))
 
+        # Normalize question_type — coerce unrecognized types so the UI
+        # can render them properly.
+        raw_q_type = ex.get("question_type", "multiple_choice")
+        if raw_q_type not in _VALID_QUESTION_TYPES:
+            if choices:
+                raw_q_type = "multiple_choice"
+            else:
+                raw_q_type = "fill_in_the_blank"
+
         exercises.append(
             Exercise(
                 concept=ex.get("concept", ""),
                 topic=ex.get("topic", ""),
                 question=ex.get("question", ""),
-                question_type=ex.get("question_type", "multiple_choice"),
+                question_type=raw_q_type,
                 choices=choices,
-                correct_answer=str(ex.get("correct_answer", "")),
+                correct_answer=str(
+                    ex.get("correct_answer")
+                    or (correct_answers[0] if correct_answers else None)
+                    or (ex.get("part_b_correct") if raw_q_type == "two_part" else None)
+                    or ""
+                ),
                 explanation=ex.get("explanation", ""),
                 scenario=ex.get("scenario"),
                 num_correct=ex.get("num_correct"),
@@ -182,22 +261,144 @@ def generate_exercises(
             )
         )
 
-    # Validate exercises against prompt contract
-    validation_errors = _validate_exercises(
-        exercises, num_questions, subject, topics=band.topics
+    return exercises
+
+
+def _call_gemma(prompt: str) -> str:
+    """Call Gemma and return the raw response content.
+
+    :param prompt: The prompt to send.
+    :return: Raw response text.
+    """
+    response = ollama.chat(
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        format="json",
     )
-    if validation_errors:
-        logger.warning(
-            "Exercise validation issues: %s", "; ".join(validation_errors)
+    return response.message.content.strip()
+
+
+_MAX_RETRIES = 2
+
+
+def generate_exercises(
+    student_name: str,
+    grade: int,
+    band: BandInfo,
+    num_questions: int = 5,
+    weak_concepts: list[str] | None = None,
+    subject: str = "math",
+) -> ExerciseSet:
+    """Generate exercises using Gemma 4.
+
+    Makes up to ``_MAX_RETRIES`` attempts, accumulating valid exercises
+    across retries until the requested count is reached.
+    """
+    prompt = build_exercise_prompt(
+        student_name=student_name,
+        grade=grade,
+        band_name=band.band,
+        topics=band.topics,
+        num_questions=num_questions,
+        weak_concepts=weak_concepts,
+        subject=subject,
+    )
+
+    # Build allowed sets once for fixup
+    allowed_topics: set[str] | None = None
+    allowed_concepts: set[str] | None = None
+    if band.topics:
+        allowed_topics, allowed_concepts = _build_allowed_sets(band.topics)
+
+    all_valid: list[Exercise] = []
+
+    for attempt in range(_MAX_RETRIES):
+        # On retry, ask for only the missing count
+        needed = num_questions - len(all_valid)
+        if needed <= 0:
+            break
+
+        if attempt > 0:
+            logger.info(
+                "Retry %d: requesting %d more exercises", attempt, needed
+            )
+            prompt = build_exercise_prompt(
+                student_name=student_name,
+                grade=grade,
+                band_name=band.band,
+                topics=band.topics,
+                num_questions=needed,
+                weak_concepts=weak_concepts,
+                subject=subject,
+            )
+
+        content = _call_gemma(prompt)
+        logger.info(
+            "Gemma response attempt %d (%d chars): %s",
+            attempt + 1,
+            len(content),
+            content[:6000],
         )
+
+        exercises = _parse_exercises(content)
+
+        # Fix up topic/concept values
+        if allowed_topics and allowed_concepts:
+            exercises = [
+                _fixup_exercise(ex, allowed_topics, allowed_concepts)
+                for ex in exercises
+            ]
+
+        for i, ex in enumerate(exercises):
+            logger.info(
+                "Exercise %d: type=%s, concept=%s, has_choices=%s, "
+                "has_correct_answer=%s",
+                i + 1,
+                ex.question_type,
+                ex.concept,
+                bool(ex.choices),
+                bool(ex.correct_answer and ex.correct_answer.strip()),
+            )
+
+        # Salvage and collect valid exercises
+        for i, ex in enumerate(exercises):
+            salvaged = _salvage_exercise(ex)
+            if salvaged is not None:
+                all_valid.append(salvaged)
+            else:
+                logger.warning(
+                    "Dropped exercise %d (attempt %d): question=%r, "
+                    "correct_answer=%r, question_type=%r, choices=%r",
+                    i + 1,
+                    attempt + 1,
+                    ex.question[:80] if ex.question else None,
+                    ex.correct_answer[:40] if ex.correct_answer else None,
+                    ex.question_type,
+                    bool(ex.choices),
+                )
+
+        if len(all_valid) >= num_questions:
+            break
+
+    if not all_valid:
         raise ValueError(
-            f"Generated exercises failed validation: {'; '.join(validation_errors)}"
+            "All generated exercises failed validation — none were usable"
         )
+
+    # Trim to requested count in case we got extras
+    all_valid = all_valid[:num_questions]
+
+    logger.info(
+        "Returning %d/%d exercises after %d attempt(s)",
+        len(all_valid),
+        num_questions,
+        attempt + 1,
+    )
 
     return ExerciseSet(
         student_name=student_name,
         band=band.band,
-        exercises=exercises,
+        exercises=all_valid,
     )
 
 

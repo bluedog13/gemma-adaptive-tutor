@@ -130,10 +130,7 @@ _EXERCISE_TYPE_GUIDANCE: dict[str, str] = {
         '"num_correct" (how many to pick), "correct_answers" (list of correct '
         "choices). Set correct_answer to the first correct answer.\n"
         "\n"
-        "3. **fill_in_the_blank** — Single numeric or short answer. "
-        'Set question_type to "fill_in_the_blank", choices=null.\n'
-        "\n"
-        "4. **two_part** — Error analysis or two-step reasoning. "
+        "3. **two_part** — Error analysis or two-step reasoning. "
         "Part A asks what went wrong or for a first answer. "
         "Part B asks for the correct answer or supporting evidence. "
         'Set question_type to "two_part", provide "choices" for Part A, '
@@ -145,8 +142,10 @@ _EXERCISE_TYPE_GUIDANCE: dict[str, str] = {
         "- Every question ends with a clear question sentence\n"
         "- Include a step-by-step explanation for each answer\n"
         "- Make word problems relatable to a child's everyday life\n"
-        "- Aim for roughly: 2 multiple_choice, 1 multi_select or two_part, "
-        "1 fill_in_the_blank, 1 of any type"
+        "- Aim for roughly: 2 multiple_choice, 1 multi_select, "
+        "1 two_part, 1 of any type\n"
+        "- EVERY question MUST have a \"choices\" array with 4 options — "
+        "do NOT use fill_in_the_blank"
     ),
     "reading": (
         "Use a MIX of these MAP-style question types (vary across questions):\n"
@@ -257,12 +256,19 @@ def build_exercise_prompt(
             f"struggling with: {', '.join(weak_concepts)}"
         )
 
-    # Format concepts grouped under their topic
+    # Format concepts grouped under their topic.
+    # Curriculum data may contain semicolon-separated compound topic names
+    # (e.g. "Decimals — Compare/Order; Decimals — Represent/Model").
+    # Split them so the LLM sees each as a separate, valid topic name.
     topic_lines: list[str] = []
     for topic_name, concepts in topics.items():
-        topic_lines.append(f"Topic: {topic_name}")
-        for concept in concepts:
-            topic_lines.append(f"  - {concept}")
+        individual_topics = [
+            t.strip() for t in topic_name.split(";") if t.strip()
+        ]
+        for indiv in individual_topics:
+            topic_lines.append(f"Topic: {indiv}")
+            for concept in concepts:
+                topic_lines.append(f"  - {concept}")
     concepts_block = chr(10).join(topic_lines)
 
     student_name = _sanitize_name(student_name)
@@ -279,17 +285,20 @@ Requirements:
 - NEVER use LaTeX, MathJax, or dollar-sign math notation (e.g., $\\frac{{3}}{{10}}$). Write fractions as plain text like "3/10", exponents as "2^3", and symbols as words or Unicode (e.g., "x", ">=", "+")
 {type_guidance}
 
-Respond with ONLY a JSON array of exercises. Each exercise must have these REQUIRED fields:
-- "concept": the specific concept being tested (use EXACTLY a concept name from the list above, do NOT include the topic name)
+CRITICAL: Return a JSON object with an "exercises" array containing EXACTLY {num_questions} exercise objects.
+Format: {{"exercises": [exercise1, exercise2, ..., exercise{num_questions}]}}
+
+Each exercise object MUST have ALL of these fields:
+- "concept": the specific concept being tested (use EXACTLY a concept name from the list above)
 - "topic": the broader topic category (use EXACTLY a Topic name from the list above)
 - "question": the full question text (do NOT put passage/scenario text here)
-- "question_type": one of "multiple_choice", "multi_select", "fill_in_the_blank", "two_part", "sequence_order", "table_matching"
-- "choices": array of 4+ options (for MC/multi_select/two_part Part A, null for fill_in_the_blank)
-- "correct_answer": the correct answer as a string
+- "question_type": one of "multiple_choice", "multi_select", "two_part", "sequence_order", "table_matching"
+- "choices": array of 4 answer options (REQUIRED for ALL question types)
+- "correct_answer": the correct answer as a string (REQUIRED — never omit this)
 - "explanation": step-by-step explanation of how to solve it
 
-OPTIONAL fields (include when the question type needs them):
-- "scenario": passage or scenario text shown above the question (REQUIRED for reading and science)
+Additional fields for specific question types:
+- "scenario": passage text shown above the question (REQUIRED for reading and science)
 - "num_correct": integer, how many to pick (for multi_select)
 - "correct_answers": array of correct answer strings (for multi_select)
 - "part_b_question": Part B question text (for two_part)
@@ -300,7 +309,7 @@ OPTIONAL fields (include when the question type needs them):
 - "match_pairs": object mapping item to correct category (for table_matching)
 - "match_options": array of category labels (for table_matching)
 
-JSON array:"""
+JSON:"""
 
 
 def build_report_prompt(
