@@ -51,6 +51,22 @@ ollama:
 pull-model:
     ollama pull gemma4:e4b
 
+# Start Ollama via Docker and pull the model
+ollama-docker:
+    docker compose up -d ollama
+    @echo "Waiting for Ollama to start..."
+    @sleep 3
+    docker compose exec ollama ollama pull gemma4:e4b
+    @echo "Gemma 4 E4B ready. Ollama running at http://localhost:11434"
+
+# Run everything via Docker (Ollama + app)
+docker:
+    docker compose up --build
+
+# Stop all Docker services
+docker-stop:
+    docker compose down
+
 # Delete the SQLite database and start fresh
 reset-db:
     rm -f map_accelerator.db

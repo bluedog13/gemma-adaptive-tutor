@@ -25,8 +25,7 @@ Thumbs.db
 *.safetensors
 *.gguf
 
-# Database
-*.db
+# Database (keep map_accelerator.db for demo data)
 *.sqlite
 
 # Logs
@@ -36,5 +35,10 @@ logs/
 # Competition papers
 .imc/
 
-# Reports with personal details
-docs/competition/sample_report.pdf
+# Internal docs & Claude Code
+docs/
+.claude/
+CLAUDE.md
+PLAN.md
+AGENTS.md
+TASKS.md

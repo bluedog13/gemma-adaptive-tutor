@@ -3,38 +3,15 @@
 import html
 import logging
 import logging.handlers
+import pathlib
 import re
 import traceback
 
-from markdown_it import MarkdownIt
-
-_md = MarkdownIt()
-
 import gradio as gr
-
-_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
-logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT)
-
-# Rolling file log: 5 MB per file, keep 3 backups (logs/map_accelerator.log)
-_log_dir = __import__("pathlib").Path(__file__).resolve().parent.parent / "logs"
-_log_dir.mkdir(exist_ok=True)
-_file_handler = logging.handlers.RotatingFileHandler(
-    _log_dir / "map_accelerator.log",
-    maxBytes=5 * 1024 * 1024,
-    backupCount=3,
-    encoding="utf-8",
-)
-_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
-_file_handler.setLevel(logging.DEBUG)
-
-logger = logging.getLogger("map_accelerator")
-logger.setLevel(logging.DEBUG)
-logger.addHandler(_file_handler)
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from markdown_it import MarkdownIt
 
 from src.constants import SEASON_ORDER, SUBJECTS
 from src.models.database import (
@@ -60,6 +37,28 @@ from src.tools.curriculum import (
 )
 from src.tools.exercise_generator import generate_exercises, generate_report
 from src.tools.score_extractor import extract_all_subjects_from_file
+
+matplotlib.use("Agg")
+
+_md = MarkdownIt()
+
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT)
+
+_log_dir = pathlib.Path(__file__).resolve().parent.parent / "logs"
+_log_dir.mkdir(exist_ok=True)
+_file_handler = logging.handlers.RotatingFileHandler(
+    _log_dir / "map_accelerator.log",
+    maxBytes=5 * 1024 * 1024,
+    backupCount=3,
+    encoding="utf-8",
+)
+_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+_file_handler.setLevel(logging.DEBUG)
+
+logger = logging.getLogger("map_accelerator")
+logger.setLevel(logging.DEBUG)
+logger.addHandler(_file_handler)
 
 
 def _grade_to_int(grade: str | int) -> int:
@@ -3024,9 +3023,7 @@ with gr.Blocks(
         student_id = student_map.get(selection)
         if not student_id:
             gr.Warning("Student not found.")
-            return gr.update(
-                choices=list(get_existing_students().keys()), value=None
-            )
+            return gr.update(choices=list(get_existing_students().keys()), value=None)
 
         db = SessionLocal()
         try:
@@ -3040,9 +3037,7 @@ with gr.Blocks(
         finally:
             db.close()
 
-        return gr.update(
-            choices=list(get_existing_students().keys()), value=None
-        )
+        return gr.update(choices=list(get_existing_students().keys()), value=None)
 
     delete_btn.click(
         fn=delete_student,
@@ -3070,4 +3065,7 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
-    demo.launch(server_port=7860, theme=theme, css=custom_css)
+    import os
+
+    host = "0.0.0.0" if os.getenv("OLLAMA_HOST") else "127.0.0.1"
+    demo.launch(server_name=host, server_port=7860, theme=theme, css=custom_css)
