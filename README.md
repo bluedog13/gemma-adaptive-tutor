@@ -10,7 +10,7 @@ Built for the [Gemma 4 Good Hackathon](https://www.kaggle.com/competitions/gemma
 
 Over **13 million students** in the US take the MAP Growth assessment (by NWEA) every year. These standardized tests produce detailed RIT scores that pinpoint exactly where each student sits on the learning continuum — what they've mastered, what they're developing, and what they're ready to learn next.
 
-But here's the gap: **the data exists, and nobody acts on it.**
+But here's the gap: **the data exists, but it isn't translating into action.**
 
 These assessments produce dense PDF reports full of scores, percentiles, and growth projections — but no tools exist to automatically turn that data into personalized learning plans. Without that bridge, advanced learners often plateau. Their growth stalls, their percentiles decline, and their potential goes unrealized.
 
