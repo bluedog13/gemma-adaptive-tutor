@@ -181,9 +181,20 @@ gemma-adaptive-tutor/
 ## Demo Walkthrough
 
 1. **Enter scores** — Type in a student's MAP RIT scores by grade and season, or upload a screenshot of their MAP report and let Gemma 4 vision extract the scores automatically.
+
+   ![Score Entry](assets/screenshots/score-entry.png)
+
 2. **See the analysis** — Gemma benchmarks the student against 2025 national norms, classifies their growth trend, and identifies the exact concepts they're ready to learn next.
+
+   ![Growth Trajectory](assets/screenshots/growth-trajectory.png)
+
 3. **Practice** — The student gets personalized exercises at their "Introduce" level, in MAP-authentic formats they'll see on the real test. Concepts they struggle with (<80% correct) automatically come back in the next session.
+
+   ![Practice](assets/screenshots/practice.png)
+
 4. **Review the report** — Teachers and parents get a dashboard with percentile charts, growth projections, and a Gemma-generated narrative summarizing the student's trajectory and next steps.
+
+   ![Report](assets/screenshots/report.png)
 
 The entire pipeline — from raw scores to personalized practice to narrative reports — runs locally on Gemma 4 E4B. **No student data ever leaves the machine.**
 
