@@ -35,6 +35,9 @@ logs/
 # Competition papers
 .imc/
 
+# Sample score report images (may contain student data)
+assets/images/
+
 # Internal docs & Claude Code
 docs/
 .claude/
