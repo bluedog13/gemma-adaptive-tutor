@@ -1,5 +1,7 @@
 # Gemma Adaptive Tutor
 
+![Gemma Adaptive Tutor](assets/gemma-adaptive-tutor-card.png)
+
 **Every advanced student deserves a learning path that moves as fast as they do.**
 
 Built for the [Gemma 4 Good Hackathon](https://www.kaggle.com/competitions/gemma-4-good-hackathon) | Track: **Future of Education**
