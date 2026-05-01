@@ -39,9 +39,9 @@ logs/
 assets/images/
 
 # Internal docs & Claude Code
-docs/
+docs/*
+!docs/architecture.md
 .claude/
 CLAUDE.md
 PLAN.md
-AGENTS.md
 TASKS.md

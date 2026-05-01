@@ -26,6 +26,7 @@ from src.models.schemas import (
 )
 from src.tools.curriculum import map_rit_to_curriculum
 from src.tools.exercise_generator import generate_exercises, generate_report
+from src.tools.student_progress import get_weak_concepts, grade_for_score
 
 
 @asynccontextmanager
@@ -117,26 +118,6 @@ def delete_student(student_id: int, db: Session = Depends(get_db)):
     return {"message": f"Student '{student.name}' deleted"}
 
 
-def _grade_for_score(
-    season: str, year: int, current_grade: int, latest_season: str, latest_year: int
-) -> int:
-    """Compute the student's grade at the time of a given score.
-
-    Mirrors the frontend ``_grade_for_score`` logic. School year runs
-    Aug-June: fall/winter of year Y = school year Y-(Y+1), spring of
-    year Y = school year (Y-1)-Y.
-    """
-
-    def _school_year(s: str, y: int) -> int:
-        if s == "spring":
-            return y - 1
-        return y
-
-    latest_sy = _school_year(latest_season, latest_year)
-    score_sy = _school_year(season, year)
-    return max(0, current_grade - (latest_sy - score_sy))
-
-
 def _upsert_scores(
     db: Session,
     student_id: int,
@@ -163,7 +144,7 @@ def _upsert_scores(
     for score_input in scores:
         score_grade = None
         if current_grade is not None:
-            score_grade = _grade_for_score(
+            score_grade = grade_for_score(
                 score_input.season,
                 score_input.year,
                 current_grade,
@@ -244,7 +225,7 @@ def create_exercises(
     curriculum = get_curriculum(student_id, subject, db)
 
     # Check past sessions for weak concepts
-    weak_concepts = _get_weak_concepts(student_id, db, subject)
+    weak_concepts = get_weak_concepts(student_id, db, subject)
 
     exercises = generate_exercises(
         student_name=student.name,
@@ -463,32 +444,3 @@ def get_report(
         "report": report_text,
         "subject": subject,
     }
-
-
-def _get_weak_concepts(
-    student_id: int, db: Session, subject: Subject = Subject.MATH
-) -> list[str]:
-    """Find concepts where the student scored < 80% in past sessions."""
-    sessions = (
-        db.query(PracticeSession)
-        .filter(
-            PracticeSession.student_id == student_id,
-            PracticeSession.subject == subject,
-            PracticeSession.completed_at.isnot(None),
-        )
-        .all()
-    )
-
-    concept_totals: dict[str, dict] = {}
-    for s in sessions:
-        for concept, data in (s.concept_scores or {}).items():
-            if concept not in concept_totals:
-                concept_totals[concept] = {"correct": 0, "total": 0}
-            concept_totals[concept]["correct"] += data.get("correct", 0)
-            concept_totals[concept]["total"] += data.get("total", 0)
-
-    return [
-        concept
-        for concept, data in concept_totals.items()
-        if data["total"] > 0 and data["correct"] / data["total"] < 0.8
-    ]

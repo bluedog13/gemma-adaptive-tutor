@@ -37,6 +37,7 @@ from src.tools.curriculum import (
 )
 from src.tools.exercise_generator import generate_exercises, generate_report
 from src.tools.score_extractor import extract_all_subjects_from_file
+from src.tools.student_progress import get_weak_concepts, grade_for_score
 
 matplotlib.use("Agg")
 
@@ -85,30 +86,6 @@ def _empty_practice_state() -> dict:
     }
 
 
-def _grade_for_score(
-    season: str, year: int, current_grade: int, latest_season: str, latest_year: int
-) -> int:
-    """Compute the student's grade at the time of a given score.
-
-    School year runs Aug-June. Fall/winter of year Y = school year Y-(Y+1).
-    Spring of year Y = school year (Y-1)-Y.
-    Example: Fall 2025 and Winter 2026 are both the 2025-2026 school year.
-             Spring 2025 is the 2024-2025 school year.
-    """
-
-    def _school_year(s: str, y: int) -> int:
-        """Return the start calendar year of the school year."""
-        if s == "spring":
-            return y - 1  # spring 2025 → 2024-2025 school year → 2024
-        return y  # fall 2025 → 2025-2026 → 2025, winter 2026 → 2025-2026 → 2025
-
-    latest_sy = _school_year(latest_season, latest_year)
-    score_sy = _school_year(season, year)
-
-    grade = current_grade - (latest_sy - score_sy)
-    return max(0, grade)
-
-
 def create_score_chart(
     scores_data, student_name, current_grade, trend=None, subject="math"
 ):
@@ -135,7 +112,7 @@ def create_score_chart(
             grades_per_score.append(_grade_to_int(s["grade"]))
         else:
             grades_per_score.append(
-                _grade_for_score(
+                grade_for_score(
                     s["season"],
                     s["year"],
                     _grade_to_int(current_grade),
@@ -523,7 +500,7 @@ def load_student(selection, subject="math"):
                 sg = str(s.grade)
             else:
                 sg = str(
-                    _grade_for_score(
+                    grade_for_score(
                         s.season,
                         s.year,
                         student.grade,
@@ -664,16 +641,20 @@ def _build_analysis_html(
     :param subject: Subject key.
     :return: HTML string.
     """
-    subject_display = SUBJECT_DISPLAY.get(subject, subject.title())
+    subject_display = html.escape(SUBJECT_DISPLAY.get(subject, subject.title()))
+    safe_name = html.escape(str(name))
+    safe_grade = html.escape(str(grade))
+    develop_band = html.escape(curriculum.develop_band.band)
+    introduce_band = html.escape(curriculum.introduce_band.band)
 
     develop_cards = []
     for topic, concepts in curriculum.develop_band.topics.items():
         concept_chips = "".join(
-            f'<span class="concept-chip">{c}</span>' for c in concepts
+            f'<span class="concept-chip">{html.escape(str(c))}</span>' for c in concepts
         )
         develop_cards.append(
             f'<div class="topic-card">'
-            f'<div class="topic-name">{topic}</div>'
+            f'<div class="topic-name">{html.escape(str(topic))}</div>'
             f'<div class="concept-chips">{concept_chips}</div>'
             f"</div>"
         )
@@ -681,11 +662,11 @@ def _build_analysis_html(
     introduce_cards = []
     for topic, concepts in curriculum.introduce_band.topics.items():
         concept_chips = "".join(
-            f'<span class="concept-chip">{c}</span>' for c in concepts
+            f'<span class="concept-chip">{html.escape(str(c))}</span>' for c in concepts
         )
         introduce_cards.append(
             f'<div class="topic-card">'
-            f'<div class="topic-name">{topic}</div>'
+            f'<div class="topic-name">{html.escape(str(topic))}</div>'
             f'<div class="concept-chips">{concept_chips}</div>'
             f"</div>"
         )
@@ -701,18 +682,20 @@ def _build_analysis_html(
                 continue
             match = re.match(r"(.+?)\*\*\s*(.*)", section, re.DOTALL)
             if match:
-                heading = match.group(1).rstrip(":").strip()
-                body = match.group(2).strip()
+                heading = html.escape(match.group(1).rstrip(":").strip())
+                body = html.escape(match.group(2).strip())
                 trend_items.append(
                     f'<li class="trend-item"><strong>{heading}:</strong> {body}</li>'
                 )
             else:
-                trend_items.append(f'<li class="trend-item">{section}</li>')
+                trend_items.append(
+                    f'<li class="trend-item">{html.escape(section)}</li>'
+                )
 
         trend_list = (
             f'<ul class="trend-list">{"".join(trend_items)}</ul>'
             if trend_items
-            else f'<p style="color: #374151; margin: 0;">{raw}</p>'
+            else f'<p style="color: #374151; margin: 0;">{html.escape(raw)}</p>'
         )
         trend_html = (
             f'<div class="band-card" style="border-left: 4px solid #6366f1;">'
@@ -730,10 +713,10 @@ def _build_analysis_html(
     introduce_body = "".join(introduce_cards)
 
     return f"""<div style="margin-bottom: 1.5rem;">
-    <h1 style="color:#1e1b4b; margin-bottom: 0.75rem;">Analysis for {name} — {subject_display}</h1>
+    <h1 style="color:#1e1b4b; margin-bottom: 0.75rem;">Analysis for {safe_name} — {subject_display}</h1>
     <span class="pill pill-primary">Latest RIT: {curriculum.rit_score}</span>
-    <span class="pill pill-secondary">Current Band: {curriculum.develop_band.band}</span>
-    <span class="pill pill-neutral">Grade: {grade}</span>
+    <span class="pill pill-secondary">Current Band: {develop_band}</span>
+    <span class="pill pill-neutral">Grade: {safe_grade}</span>
 </div>
 
 {trend_html}
@@ -742,7 +725,7 @@ def _build_analysis_html(
     <div class="band-header">
         <span class="band-icon">📚</span>
         Currently Mastering
-        <span class="band-badge develop">Develop Band: {curriculum.develop_band.band}</span>
+        <span class="band-badge develop">Develop Band: {develop_band}</span>
     </div>
     <p class="band-subtitle">Topics the student is working on now</p>
     <div class="topic-grid">{develop_body}</div>
@@ -752,7 +735,7 @@ def _build_analysis_html(
     <div class="band-header">
         <span class="band-icon">🚀</span>
         Ready for Launch
-        <span class="band-badge introduce">Introduce Band: {curriculum.introduce_band.band}</span>
+        <span class="band-badge introduce">Introduce Band: {introduce_band}</span>
     </div>
     <p class="band-subtitle">Concepts to introduce in the next practice session</p>
     <div class="topic-grid">{introduce_body}</div>
@@ -972,7 +955,7 @@ def start_practice(student_id, num_questions, pstate, subject="math"):
             )
 
         # Check weak concepts from prior sessions
-        weak = _get_weak_concepts(student.id, db, subject)
+        weak = get_weak_concepts(student.id, db, subject)
 
         try:
             exercises = generate_exercises(
@@ -2315,33 +2298,6 @@ def get_progress_report(student_id, subject="math", progress=gr.Progress()):
         db.close()
 
 
-def _get_weak_concepts(student_id: int, db, subject: str = "math") -> list[str]:
-    """Find concepts where the student scored < 80%."""
-    sessions = (
-        db.query(PracticeSession)
-        .filter(
-            PracticeSession.student_id == student_id,
-            PracticeSession.subject == subject,
-            PracticeSession.completed_at.isnot(None),
-        )
-        .all()
-    )
-
-    concept_totals = {}
-    for s in sessions:
-        for concept, data in (s.concept_scores or {}).items():
-            if concept not in concept_totals:
-                concept_totals[concept] = {"correct": 0, "total": 0}
-            concept_totals[concept]["correct"] += data.get("correct", 0)
-            concept_totals[concept]["total"] += data.get("total", 0)
-
-    return [
-        c
-        for c, d in concept_totals.items()
-        if d["total"] > 0 and d["correct"] / d["total"] < 0.8
-    ]
-
-
 # --- Build the UI ---
 
 theme = gr.themes.Soft(
@@ -2596,6 +2552,12 @@ button.secondary.sm:hover { background: #e0e7ff !important; transform: translate
 """
 
 custom_css = theme.custom_css
+custom_head = (
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    '<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family='
+    'Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">'
+)
 
 _SUBJECT_ICONS = {"math": "🔢", "reading": "📖", "science": "🔬"}
 
@@ -2982,10 +2944,7 @@ def _build_report_tab(subject: str, student_id_state):
     )
 
 
-with gr.Blocks(
-    title="MAP Accelerator",
-    head='<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">',
-) as demo:
+with gr.Blocks(title="MAP Accelerator") as demo:
     gr.HTML("""
         <div style="text-align: center; padding: 2rem 0;">
             <h1 style="font-size: 2.5rem; font-weight: 800; color: #1e1b4b; margin-bottom: 0.5rem;">MAP Accelerator</h1>
@@ -3068,4 +3027,10 @@ if __name__ == "__main__":
     import os
 
     host = "0.0.0.0" if os.getenv("OLLAMA_HOST") else "127.0.0.1"
-    demo.launch(server_name=host, server_port=7860, theme=theme, css=custom_css)
+    demo.launch(
+        server_name=host,
+        server_port=7860,
+        theme=theme,
+        css=custom_css,
+        head=custom_head,
+    )

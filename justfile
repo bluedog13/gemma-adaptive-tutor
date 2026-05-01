@@ -14,7 +14,7 @@ app:
 
 # Run the FastAPI backend
 api:
-    uv run python -m src.api.main
+    uv run uvicorn src.api.main:app --reload
 
 # Run all tests
 test *args:
@@ -26,19 +26,19 @@ test-one path:
 
 # Lint with ruff
 lint:
-    uv run ruff check src/ frontend/ tests/
+    uv run ruff check src/ frontend/
 
 # Fix lint issues
 lint-fix:
-    uv run ruff check --fix src/ frontend/ tests/
+    uv run ruff check --fix src/ frontend/
 
 # Format code
 fmt:
-    uv run ruff format src/ frontend/ tests/
+    uv run ruff format src/ frontend/
 
 # Check formatting without changing files
 fmt-check:
-    uv run ruff format --check src/ frontend/ tests/
+    uv run ruff format --check src/ frontend/
 
 # Lint + format check
 check: lint fmt-check
