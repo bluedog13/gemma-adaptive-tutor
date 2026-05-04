@@ -208,4 +208,4 @@ All percentile and growth data is sourced from the **2025 MAP Growth Norms Techn
 
 ## License
 
-Apache 2.0
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for attribution requirements — downstream users must preserve the notice when redistributing.
